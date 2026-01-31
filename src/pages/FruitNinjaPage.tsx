@@ -35,6 +35,7 @@ const FruitNinjaPage: React.FC = () => {
   
   const popSoundRef = useRef<HTMLAudioElement | null>(null);
   const errorSoundRef = useRef<HTMLAudioElement | null>(null);
+  const finishedRef = useRef(false);
 
   const fruitColors = ['#A0C4FF', '#B8E0D2', '#FFD6A5', '#FFC8DD', '#D9B3FF'];
   const jellyfishColor = '#D4B5E8';
@@ -151,6 +152,7 @@ const FruitNinjaPage: React.FC = () => {
   const startGame = () => {
     if (!isSessionActive) return;
     // Reset stats
+    finishedRef.current = false;
     reactionTimesRef.current = [];
     hitsRef.current = 0;
     missesRef.current = 0;
@@ -165,6 +167,8 @@ const FruitNinjaPage: React.FC = () => {
   };
 
   const finishGame = async () => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
     setGameState('gameOver');
     
     // Calcul des KPIs pour l'API

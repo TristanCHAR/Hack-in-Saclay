@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import { api } from '../services/api';
 import './JeuDuBruitPage.css';
 
 interface Platform {
@@ -36,6 +37,13 @@ const JeuDuBruitPage: React.FC = () => {
   const platformsRef = useRef<Platform[]>([]);
   const scrollXRef = useRef(0);
   const nextPlatformIdRef = useRef(0);
+
+  // Métriques pour l'API
+  const gameEndedRef = useRef(false);
+  const jumpCountRef = useRef(0);
+  const gameStartTimeRef = useRef(0);
+  const totalAirTimeRef = useRef(0);
+  const airTimeStartRef = useRef<number | null>(null);
 
   // Constantes CALIBRÉES
   const JUMP_FORCE = -18;
@@ -96,6 +104,8 @@ const JeuDuBruitPage: React.FC = () => {
     if (avg > VOLUME_THRESHOLD && !isJumping) {
       velocityYRef.current = JUMP_FORCE;
       setIsJumping(true);
+      jumpCountRef.current++;
+      airTimeStartRef.current = Date.now();
     }
     
     audioRequestRef.current = requestAnimationFrame(checkVolume);
@@ -121,6 +131,11 @@ const JeuDuBruitPage: React.FC = () => {
   };
 
   const initGame = async () => {
+    gameEndedRef.current = false;
+    jumpCountRef.current = 0;
+    gameStartTimeRef.current = Date.now();
+    totalAirTimeRef.current = 0;
+    airTimeStartRef.current = null;
     setScore(0);
     scrollXRef.current = 0;
     charYRef.current = 0;
@@ -175,6 +190,10 @@ const JeuDuBruitPage: React.FC = () => {
           velocityYRef.current = 0;
           onPlatform = true;
           setIsJumping(false);
+          if (airTimeStartRef.current !== null) {
+            totalAirTimeRef.current += Date.now() - airTimeStartRef.current;
+            airTimeStartRef.current = null;
+          }
           break;
         }
       }
@@ -219,9 +238,25 @@ const JeuDuBruitPage: React.FC = () => {
     };
   }, [gameState, gameLoop]);
 
-  const endGame = () => {
+  const endGame = async () => {
+    if (gameEndedRef.current) return;
+    gameEndedRef.current = true;
     setGameState('gameOver');
     stopAudio();
+
+    // Calcul des métriques
+    const gameDuration = Date.now() - gameStartTimeRef.current;
+    const jumps = jumpCountRef.current;
+    const vocal_initention_latence = jumps > 0 ? Math.round(gameDuration / jumps) : 0;
+    const motrice_planification = jumps > 0 ? Math.round(totalAirTimeRef.current / jumps) : 0;
+
+    try {
+      await api.createNoiseGameResult(vocal_initention_latence, motrice_planification);
+      console.log('Score NoiseGame envoyé à l\'API');
+    } catch (err) {
+      console.error('Erreur envoi score NoiseGame:', err);
+    }
+
     if (score > highScore) {
       setHighScore(score);
       localStorage.setItem('jeuDuBruitHighScore', score.toString());

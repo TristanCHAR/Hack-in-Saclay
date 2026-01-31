@@ -1,12 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, ReferenceDot,
   ScatterChart, Scatter, ZAxis, Cell
 } from 'recharts';
-import { TrendingDown, TrendingUp, Pill, Brain, Activity, Mic, Zap } from 'lucide-react';
+import {
+  TrendingDown, TrendingUp, Pill, Brain, Activity, Mic, Zap,
+  RefreshCw, BarChart3
+} from 'lucide-react';
 import { api } from '../services/api';
 import './AnalysisPage.css';
+
+const BrainScene = React.lazy(() => import('../components/BrainScene'));
 
 /* ═══════════════════════════════════════════════════════════
    TYPES
@@ -23,10 +28,11 @@ interface TimelinePoint {
   motrice: number | null;
   drugCount: number;
   criseCount: number;
+  inhibition: number | null;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   HELPERS
+   MATH HELPERS
    ═══════════════════════════════════════════════════════════ */
 const toDate = (s: string) => new Date(s.replace(' ', 'T'));
 const dayOf = (s: string) => s.split(' ')[0];
@@ -35,12 +41,32 @@ const fmtDay = (d: string) => {
   return `${parseInt(p[2])}/${parseInt(p[1])}`;
 };
 const avg = (a: number[]) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0);
-const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-/* ── Impact Ratio: crises 7j actuels vs 7j précédents ── */
+function stdDev(arr: number[]): number {
+  if (arr.length < 2) return 0;
+  const m = avg(arr);
+  return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / arr.length);
+}
+
+function pearson(x: number[], y: number[]): number {
+  if (x.length !== y.length || x.length < 3) return 0;
+  const n = x.length;
+  const sx = x.reduce((a, b) => a + b, 0);
+  const sy = y.reduce((a, b) => a + b, 0);
+  const sxy = x.reduce((a, xi, i) => a + xi * y[i], 0);
+  const sx2 = x.reduce((a, xi) => a + xi * xi, 0);
+  const sy2 = y.reduce((a, yi) => a + yi * yi, 0);
+  const num = n * sxy - sx * sy;
+  const den = Math.sqrt((n * sx2 - sx * sx) * (n * sy2 - sy * sy));
+  return den === 0 ? 0 : num / den;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DOMAIN LOGIC
+   ═══════════════════════════════════════════════════════════ */
 function impactRatio(crises: Crise[]): number {
-  const now = Date.now();
-  const W = 7 * 864e5;
+  const now = Date.now(), W = 7 * 864e5;
   const curr = crises.filter(c => now - toDate(c.created_at).getTime() <= W).length;
   const prev = crises.filter(c => {
     const d = now - toDate(c.created_at).getTime();
@@ -50,16 +76,13 @@ function impactRatio(crises: Crise[]): number {
   return ((curr - prev) / prev) * 100;
 }
 
-/* ── Adhérence: prises / objectif théorique (2/jour × 7j = 14) ── */
-function adherence(drugs: Drug[]): { count: number; target: number; pct: number } {
-  const now = Date.now();
-  const W = 7 * 864e5;
+function adherenceCalc(drugs: Drug[]): { count: number; target: number; pct: number } {
+  const now = Date.now(), W = 7 * 864e5;
   const count = drugs.filter(d => now - toDate(d.created_at).getTime() <= W).length;
   const target = 14;
   return { count, target, pct: clamp((count / target) * 100, 0, 100) };
 }
 
-/* ── Stabilité cognitive: moyenne pondérée IIV + planification motrice ── */
 function stabilityScore(fp: FlashPop[], ng: NoiseGame[]): number {
   if (!fp.length && !ng.length) return 0;
   const iiv = fp.length ? clamp(100 - avg(fp.map(f => f.iiv_score)) * 2, 0, 100) : 50;
@@ -67,7 +90,6 @@ function stabilityScore(fp: FlashPop[], ng: NoiseGame[]): number {
   return Math.round(0.5 * iiv + 0.5 * mot);
 }
 
-/* ── Timeline par jour ── */
 function buildTimeline(
   crises: Crise[], drugs: Drug[], fps: FlashPop[], ngs: NoiseGame[]
 ): TimelinePoint[] {
@@ -76,67 +98,73 @@ function buildTimeline(
   return Array.from(days).sort().map(d => {
     const dfp = fps.filter(f => dayOf(f.created_at) === d);
     const dng = ngs.filter(n => dayOf(n.created_at) === d);
-    const dDrugs = drugs.filter(dr => dayOf(dr.created_at) === d);
-    const dCrises = crises.filter(c => dayOf(c.created_at) === d);
     return {
-      date: d,
-      label: fmtDay(d),
+      date: d, label: fmtDay(d),
       mrt: dfp.length ? Math.round(avg(dfp.map(f => f.mrt))) : null,
       motrice: dng.length ? Math.round(avg(dng.map(n => n.motrice_planification))) : null,
-      drugCount: dDrugs.length,
-      criseCount: dCrises.length,
+      inhibition: dfp.length ? Math.round(avg(dfp.map(f => f.inhibition_rate)) * 100) / 100 : null,
+      drugCount: drugs.filter(dr => dayOf(dr.created_at) === d).length,
+      criseCount: crises.filter(c => dayOf(c.created_at) === d).length,
     };
   });
 }
 
 function getLastDrug(drugs: Drug[]): string {
   if (!drugs.length) return '—';
-  const sorted = [...drugs].sort((a, b) => toDate(b.created_at).getTime() - toDate(a.created_at).getTime());
-  return sorted[0].name;
+  return [...drugs].sort((a, b) => toDate(b.created_at).getTime() - toDate(a.created_at).getTime())[0].name;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   VOCAL STRESS GAUGE (SVG)
+   ANIMATED COUNT-UP HOOK
+   ═══════════════════════════════════════════════════════════ */
+function useCountUp(target: number, decimals = 1, duration = 1400) {
+  const [val, setVal] = useState(0);
+  const prev = useRef(0);
+  useEffect(() => {
+    const from = prev.current;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 4);
+      setVal(from + (target - from) * eased);
+      if (t < 1) requestAnimationFrame(tick);
+      else prev.current = target;
+    };
+    requestAnimationFrame(tick);
+  }, [target, duration]);
+  return Number(val.toFixed(decimals));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VOCAL GAUGE (SVG + glow)
    ═══════════════════════════════════════════════════════════ */
 const VocalGauge: React.FC<{ value: number; maxVal: number }> = ({ value, maxVal }) => {
   const pct = clamp(value / maxVal, 0, 1);
   const R = 70, CX = 90, CY = 90;
-  const circumference = Math.PI * R;
-  const offset = circumference * (1 - pct);
-  const hue = (1 - pct) * 120; // 120 = green, 0 = red
+  const circ = Math.PI * R;
+  const offset = circ * (1 - pct);
+  const hue = (1 - pct) * 120;
   const color = `hsl(${hue}, 80%, 55%)`;
-
   return (
     <div className="gauge-wrapper">
       <svg viewBox="0 0 180 110" className="gauge-svg">
-        <path
-          d={`M ${CX - R},${CY} A ${R},${R} 0 0,1 ${CX + R},${CY}`}
-          fill="none"
-          stroke="#eaeaea"
-          strokeWidth="14"
-          strokeLinecap="round"
-        />
-        <path
-          d={`M ${CX - R},${CY} A ${R},${R} 0 0,1 ${CX + R},${CY}`}
-          fill="none"
-          stroke={color}
-          strokeWidth="14"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 1s ease, stroke 1s ease' }}
-        />
-        <text x={CX} y={CY - 15} textAnchor="middle" className="gauge-value-text">
-          {Math.round(value)}
-        </text>
-        <text x={CX} y={CY + 5} textAnchor="middle" className="gauge-unit-text">
-          ms
-        </text>
+        <defs>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+        <path d={`M ${CX - R},${CY} A ${R},${R} 0 0,1 ${CX + R},${CY}`}
+          fill="none" stroke="#eaeaea" strokeWidth="14" strokeLinecap="round" />
+        <path d={`M ${CX - R},${CY} A ${R},${R} 0 0,1 ${CX + R},${CY}`}
+          fill="none" stroke={color} strokeWidth="14" strokeLinecap="round"
+          strokeDasharray={circ} strokeDashoffset={offset}
+          filter="url(#glow)"
+          style={{ transition: 'stroke-dashoffset 1.2s ease, stroke 1.2s ease' }} />
+        <text x={CX} y={CY - 15} textAnchor="middle" className="gauge-value-text">{Math.round(value)}</text>
+        <text x={CX} y={CY + 5} textAnchor="middle" className="gauge-unit-text">ms</text>
       </svg>
-      <div className="gauge-labels">
-        <span>Optimal</span>
-        <span>Fatigue</span>
-      </div>
+      <div className="gauge-labels"><span>Optimal</span><span>Fatigue</span></div>
     </div>
   );
 };
@@ -151,8 +179,8 @@ const ChartTooltip = ({ active, payload, label }: any) => {
       <p className="tooltip-label">{label}</p>
       {payload.map((p: any, i: number) =>
         p.value != null ? (
-          <p key={i} style={{ color: p.color }}>
-            {p.name}: <strong>{p.value} ms</strong>
+          <p key={i} style={{ color: p.color || p.stroke }}>
+            {p.name}: <strong>{typeof p.value === 'number' ? p.value.toFixed(1) : p.value}</strong>
           </p>
         ) : null
       )}
@@ -170,95 +198,91 @@ const AnalysisPage: React.FC = () => {
   const [noiseGames, setNoiseGames] = useState<NoiseGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const [c, d, fp, ng] = await Promise.all([
+        api.getCrises(), api.getDrugs(),
+        api.getFlashPopHistory(), api.getNoiseGameHistory(),
+      ]);
+      setCrises(Array.isArray(c) ? c : []);
+      setDrugs(Array.isArray(d) ? d : []);
+      setFlashPops(Array.isArray(fp) ? fp : []);
+      setNoiseGames(Array.isArray(ng) ? ng : []);
+      setError(null);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
 
   useEffect(() => {
-    Promise.all([
-      api.getCrises(),
-      api.getDrugs(),
-      api.getFlashPopHistory(),
-      api.getNoiseGameHistory(),
-    ])
-      .then(([c, d, fp, ng]) => {
-        setCrises(Array.isArray(c) ? c : []);
-        setDrugs(Array.isArray(d) ? d : []);
-        setFlashPops(Array.isArray(fp) ? fp : []);
-        setNoiseGames(Array.isArray(ng) ? ng : []);
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
+    fetchData().finally(() => setLoading(false));
+    const interval = setInterval(fetchData, 15000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── Computed values ── */
-  const impact = useMemo(() => impactRatio(crises), [crises]);
-  const adh = useMemo(() => adherence(drugs), [drugs]);
-  const stability = useMemo(() => stabilityScore(flashPops, noiseGames), [flashPops, noiseGames]);
-  const timeline = useMemo(
-    () => buildTimeline(crises, drugs, flashPops, noiseGames),
-    [crises, drugs, flashPops, noiseGames]
-  );
-  const baselineMrt = useMemo(
-    () => (flashPops.length ? Math.round(avg(flashPops.map(f => f.mrt))) : null),
-    [flashPops]
-  );
-  const baselineVocal = useMemo(
-    () => (noiseGames.length ? Math.round(avg(noiseGames.map(n => n.vocal_initention_latence))) : null),
-    [noiseGames]
-  );
-  const avgVocal = useMemo(
-    () => (noiseGames.length ? avg(noiseGames.map(n => n.vocal_initention_latence)) : 0),
-    [noiseGames]
-  );
-  const maxVocal = useMemo(
-    () => (noiseGames.length ? Math.max(...noiseGames.map(n => n.vocal_initention_latence), 500) : 500),
-    [noiseGames]
-  );
-  const lastDrug = useMemo(() => getLastDrug(drugs), [drugs]);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setTimeout(() => setRefreshing(false), 600);
+  };
 
-  const inhibitionData = useMemo(
-    () =>
-      flashPops.map(fp => ({
-        date: fmtDay(dayOf(fp.created_at)),
-        ts: toDate(fp.created_at).getTime(),
-        rate: fp.inhibition_rate,
-        iiv: fp.iiv_score,
-      })),
-    [flashPops]
-  );
+  /* ── Computed ── */
+  const impact = useMemo(() => impactRatio(crises), [crises]);
+  const adh = useMemo(() => adherenceCalc(drugs), [drugs]);
+  const stability = useMemo(() => stabilityScore(flashPops, noiseGames), [flashPops, noiseGames]);
+  const timeline = useMemo(() => buildTimeline(crises, drugs, flashPops, noiseGames), [crises, drugs, flashPops, noiseGames]);
+  const baselineMrt = useMemo(() => flashPops.length ? Math.round(avg(flashPops.map(f => f.mrt))) : null, [flashPops]);
+  const baselineVocal = useMemo(() => noiseGames.length ? Math.round(avg(noiseGames.map(n => n.vocal_initention_latence))) : null, [noiseGames]);
+  const avgVocal = useMemo(() => noiseGames.length ? avg(noiseGames.map(n => n.vocal_initention_latence)) : 0, [noiseGames]);
+  const maxVocal = useMemo(() => noiseGames.length ? Math.max(...noiseGames.map(n => n.vocal_initention_latence), 500) : 500, [noiseGames]);
+  const lastDrug = useMemo(() => getLastDrug(drugs), [drugs]);
+  const totalSessions = flashPops.length + noiseGames.length;
+
+  /* ── Stats ── */
+  const stats = useMemo(() => {
+    const mrtArr = flashPops.map(f => f.mrt);
+    const motriceArr = noiseGames.map(n => n.motrice_planification);
+    const inhibArr = flashPops.map(f => f.inhibition_rate);
+    const tl = timeline.filter(t => t.mrt !== null);
+    const r = pearson(tl.map(t => t.drugCount), tl.map(t => t.mrt as number));
+    return {
+      mrtMean: avg(mrtArr), mrtStdDev: stdDev(mrtArr),
+      motriceMean: avg(motriceArr), motriceStdDev: stdDev(motriceArr),
+      inhibMean: avg(inhibArr), correlation: r,
+      totalDataPoints: flashPops.length + noiseGames.length + crises.length + drugs.length,
+    };
+  }, [flashPops, noiseGames, crises, drugs, timeline]);
+
+  /* ── Animated ── */
+  const animImpact = useCountUp(impact);
+  const animStability = useCountUp(stability, 0);
+  const animMrt = useCountUp(stats.mrtMean, 0);
+
+  const inhibitionData = useMemo(() =>
+    flashPops.map(fp => ({
+      date: fmtDay(dayOf(fp.created_at)),
+      ts: toDate(fp.created_at).getTime(),
+      rate: fp.inhibition_rate,
+      iiv: fp.iiv_score,
+    })), [flashPops]);
 
   const hasData = crises.length || drugs.length || flashPops.length || noiseGames.length;
 
-  /* ── Loading ── */
   if (loading) {
-    return (
-      <div className="metrics-page">
-        <div className="metrics-loading">
-          <div className="spinner" />
-          <p>Chargement des données...</p>
-        </div>
-      </div>
-    );
+    return (<div className="metrics-page"><div className="metrics-loading"><div className="spinner" /><p>Chargement des données...</p></div></div>);
   }
-
-  /* ── Error ── */
-  if (error) {
-    return (
-      <div className="metrics-page">
-        <div className="metrics-empty">
-          <Activity size={48} />
-          <p>Erreur de connexion : {error}</p>
-        </div>
-      </div>
-    );
+  if (error && !hasData) {
+    return (<div className="metrics-page"><div className="metrics-empty"><Activity size={48} /><p>Erreur : {error}</p></div></div>);
   }
-
-  /* ── Empty ── */
   if (!hasData) {
     return (
       <div className="metrics-page">
         <div className="metrics-empty">
-          <Brain size={48} />
-          <h3>Aucune donnée disponible</h3>
-          <p>Jouez à Flash Pop ou au Jeu du Bruit pour commencer à collecter des métriques cognitives.</p>
+          <Brain size={48} /><h3>Aucune donnée disponible</h3>
+          <p>Jouez à Flash Pop ou au Jeu du Bruit pour commencer à collecter des métriques.</p>
         </div>
       </div>
     );
@@ -266,260 +290,183 @@ const AnalysisPage: React.FC = () => {
 
   return (
     <div className="metrics-page">
-      <h1 className="metrics-title">Tableau de Bord Médical</h1>
-      <p className="metrics-subtitle">Corrélation traitement — performance cognitive</p>
+      {/* ═══ HEADER ═══ */}
+      <div className="metrics-header-row">
+        <div>
+          <h1 className="metrics-title">NeuroPerformance</h1>
+          <p className="metrics-subtitle">{stats.totalDataPoints} données — Dernier traitement : {lastDrug}</p>
+        </div>
+        <button className={`btn-refresh ${refreshing ? 'spinning' : ''}`} onClick={handleRefresh}>
+          <RefreshCw size={18} />
+        </button>
+      </div>
 
-      {/* ════════════════════════════════════════════════════
-          HERO KPI STRIP
-          ════════════════════════════════════════════════════ */}
-      <div className="metrics-kpi-strip">
-        {/* Réduction des Crises */}
-        <div className="metrics-glass metrics-kpi-card">
-          <div className={`kpi-icon-box ${impact <= 0 ? 'kpi-green' : 'kpi-red'}`}>
-            {impact <= 0 ? <TrendingDown size={22} /> : <TrendingUp size={22} />}
-          </div>
-          <div className="kpi-body">
-            <span className="kpi-label">Réduction des Crises</span>
-            <span className={`kpi-value ${impact <= 0 ? 'text-green' : 'text-red'}`}>
-              {impact > 0 ? '+' : ''}{impact.toFixed(1)}%
-            </span>
-            <span className="kpi-hint">7j vs 7j précédents</span>
+      {/* ═══ HERO: 3D BRAIN + KPIs ═══ */}
+      <div className="metrics-hero">
+        <div className="brain-container metrics-glass">
+          <Suspense fallback={<div className="brain-fallback"><Brain size={64} className="pulse-icon" /></div>}>
+            <BrainScene stability={stability} dataCount={totalSessions}
+              criseCount={crises.length} drugCount={drugs.length} flashPopCount={flashPops.length} />
+          </Suspense>
+          <div className="brain-overlay">
+            <span className="brain-score">{animStability}</span>
+            <span className="brain-label">Stabilité Cognitive</span>
           </div>
         </div>
 
-        {/* Adhérence au Traitement */}
-        <div className="metrics-glass metrics-kpi-card">
-          <div className="kpi-icon-box kpi-blue">
-            <Pill size={22} />
-          </div>
-          <div className="kpi-body">
-            <span className="kpi-label">Adhérence au Traitement</span>
-            <span className="kpi-value">
-              {adh.count}<span className="kpi-frac">/{adh.target}</span>
-            </span>
-            <div className="kpi-bar">
-              <div className="kpi-bar-fill" style={{ width: `${adh.pct}%` }} />
+        <div className="metrics-kpi-strip">
+          <div className="metrics-glass metrics-kpi-card fade-in-up" style={{ animationDelay: '0.1s' }}>
+            <div className={`kpi-icon-box ${impact <= 0 ? 'kpi-green' : 'kpi-red'}`}>
+              {impact <= 0 ? <TrendingDown size={22} /> : <TrendingUp size={22} />}
+            </div>
+            <div className="kpi-body">
+              <span className="kpi-label">Réduction des Crises</span>
+              <span className={`kpi-value ${impact <= 0 ? 'text-green' : 'text-red'}`}>
+                {impact > 0 ? '+' : ''}{animImpact.toFixed(1)}%
+              </span>
+              <span className="kpi-hint">7j vs 7j précédents</span>
             </div>
           </div>
-        </div>
 
-        {/* Score de Stabilité Cognitive */}
-        <div className="metrics-glass metrics-kpi-card">
-          <div className="kpi-icon-box kpi-purple">
-            <Brain size={22} />
+          <div className="metrics-glass metrics-kpi-card fade-in-up" style={{ animationDelay: '0.2s' }}>
+            <div className="kpi-icon-box kpi-blue"><Pill size={22} /></div>
+            <div className="kpi-body">
+              <span className="kpi-label">Adhérence Traitement</span>
+              <span className="kpi-value">{adh.count}<span className="kpi-frac">/{adh.target}</span></span>
+              <div className="kpi-bar"><div className="kpi-bar-fill" style={{ width: `${adh.pct}%` }} /></div>
+            </div>
           </div>
-          <div className="kpi-body">
-            <span className="kpi-label">Stabilité Cognitive</span>
-            <span className="kpi-value">
-              {stability}<span className="kpi-frac">/100</span>
-            </span>
-            <span className="kpi-hint">IIV + Planification motrice</span>
+
+          <div className="metrics-glass metrics-kpi-card fade-in-up" style={{ animationDelay: '0.3s' }}>
+            <div className="kpi-icon-box kpi-purple"><Zap size={22} /></div>
+            <div className="kpi-body">
+              <span className="kpi-label">MRT Moyen</span>
+              <span className="kpi-value">{animMrt}<span className="kpi-frac"> ms</span></span>
+              <span className="kpi-hint">{stats.mrtStdDev > 0 ? `σ = ${stats.mrtStdDev.toFixed(1)}` : 'En attente'}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ════════════════════════════════════════════════════
-          MASTER CORRELATION CHART
-          ════════════════════════════════════════════════════ */}
-      <section className="metrics-section">
-        <h2 className="metrics-section-title">Corrélation Traitement — Performance</h2>
+      {/* ═══ STATS BANNER ═══ */}
+      <div className="stats-banner fade-in-up" style={{ animationDelay: '0.35s' }}>
+        <div className="stat-chip"><span className="stat-label-mini">n =</span><span className="stat-val-mini">{stats.totalDataPoints}</span></div>
+        <div className="stat-chip">
+          <span className="stat-label-mini">r(Drug,MRT) =</span>
+          <span className={`stat-val-mini ${Math.abs(stats.correlation) > 0.3 ? 'text-green' : ''}`}>{stats.correlation.toFixed(3)}</span>
+        </div>
+        <div className="stat-chip"><span className="stat-label-mini">σ MRT =</span><span className="stat-val-mini">{stats.mrtStdDev.toFixed(1)}</span></div>
+        <div className="stat-chip"><span className="stat-label-mini">σ Motrice =</span><span className="stat-val-mini">{stats.motriceStdDev.toFixed(1)}</span></div>
+        <div className="stat-chip"><span className="stat-label-mini">Inhib. moy =</span><span className="stat-val-mini">{(stats.inhibMean * 100).toFixed(0)}%</span></div>
+      </div>
+
+      {/* ═══ MASTER CORRELATION CHART ═══ */}
+      <section className="metrics-section fade-in-up" style={{ animationDelay: '0.4s' }}>
+        <div className="section-title-row"><BarChart3 size={20} /><h2 className="metrics-section-title">Corrélation Traitement — Performance</h2></div>
         <div className="metrics-glass metrics-chart-box">
           {timeline.length > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height={340}>
-                <LineChart data={timeline} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={360}>
+                <AreaChart data={timeline} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradMrt" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4facfe" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#4facfe" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gradMotrice" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#9C7CFF" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#9C7CFF" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: '#999', fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    yAxisId="left"
-                    tick={{ fill: '#999', fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    label={{ value: 'MRT (ms)', angle: -90, position: 'insideLeft', fill: '#999', fontSize: 11, dx: 15 }}
-                  />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    tick={{ fill: '#999', fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    label={{ value: 'Planif. (ms)', angle: 90, position: 'insideRight', fill: '#999', fontSize: 11, dx: -15 }}
-                  />
+                  <XAxis dataKey="label" tick={{ fill: '#999', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
 
-                  {/* Drug "bars" — thick transparent vertical lines */}
                   {timeline.filter(t => t.drugCount > 0).map((t, i) => (
-                    <ReferenceLine
-                      key={`drug-${i}`}
-                      x={t.label}
-                      yAxisId="left"
-                      stroke="#4facfe"
-                      strokeWidth={28}
-                      strokeOpacity={0.08}
-                    />
+                    <ReferenceLine key={`drug-${i}`} x={t.label} yAxisId="left" stroke="#4facfe" strokeWidth={32} strokeOpacity={0.07} />
                   ))}
-
-                  {/* Baseline MRT (dashed) */}
                   {baselineMrt != null && (
-                    <ReferenceLine
-                      yAxisId="left"
-                      y={baselineMrt}
-                      stroke="#4facfe"
-                      strokeDasharray="6 4"
-                      strokeOpacity={0.35}
-                    />
+                    <ReferenceLine yAxisId="left" y={baselineMrt} stroke="#4facfe" strokeDasharray="6 4" strokeOpacity={0.35}
+                      label={{ value: `Baseline ${baselineMrt}ms`, fill: '#4facfe', fontSize: 10, position: 'right' }} />
                   )}
 
-                  {/* Performance lines */}
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="mrt"
-                    stroke="#4facfe"
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: '#4facfe', stroke: '#fff', strokeWidth: 2 }}
-                    connectNulls
-                    name="MRT (Flash Pop)"
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="motrice"
-                    stroke="#9C7CFF"
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: '#9C7CFF', stroke: '#fff', strokeWidth: 2 }}
-                    connectNulls
-                    name="Planif. Motrice"
-                  />
+                  <Area yAxisId="left" type="monotone" dataKey="mrt" stroke="#4facfe" strokeWidth={3}
+                    fill="url(#gradMrt)" fillOpacity={1} connectNulls name="MRT (Flash Pop)"
+                    dot={{ r: 5, fill: '#4facfe', stroke: '#fff', strokeWidth: 2 }}
+                    activeDot={{ r: 7, stroke: '#4facfe', strokeWidth: 2, fill: '#fff' }} />
+                  <Area yAxisId="right" type="monotone" dataKey="motrice" stroke="#9C7CFF" strokeWidth={3}
+                    fill="url(#gradMotrice)" fillOpacity={1} connectNulls name="Planif. Motrice (ms)"
+                    dot={{ r: 5, fill: '#9C7CFF', stroke: '#fff', strokeWidth: 2 }}
+                    activeDot={{ r: 7, stroke: '#9C7CFF', strokeWidth: 2, fill: '#fff' }} />
 
-                  {/* Crisis markers — red dots */}
                   {timeline.filter(t => t.criseCount > 0).map((t, i) => (
-                    <ReferenceDot
-                      key={`crise-${i}`}
-                      x={t.label}
-                      y={t.mrt ?? baselineMrt ?? 300}
-                      yAxisId="left"
-                      r={7}
-                      fill="#FF6B6B"
-                      stroke="#fff"
-                      strokeWidth={3}
-                    />
+                    <ReferenceDot key={`c-${i}`} x={t.label} y={t.mrt ?? baselineMrt ?? 300}
+                      yAxisId="left" r={8} fill="#FF6B6B" stroke="#fff" strokeWidth={3} />
                   ))}
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
-
               <div className="chart-legend-row">
-                <span className="legend-chip">
-                  <span className="ldot" style={{ background: '#4facfe' }} />MRT (Flash Pop)
-                </span>
-                <span className="legend-chip">
-                  <span className="ldot" style={{ background: '#9C7CFF' }} />Planif. Motrice
-                </span>
-                <span className="legend-chip">
-                  <span className="ldot" style={{ background: 'rgba(96,165,250,0.35)' }} />Prise médicament
-                </span>
-                <span className="legend-chip">
-                  <span className="ldot" style={{ background: '#FF6B6B' }} />Crise
-                </span>
+                <span className="legend-chip"><span className="ldot" style={{ background: '#4facfe' }} />MRT</span>
+                <span className="legend-chip"><span className="ldot" style={{ background: '#9C7CFF' }} />Planif. Motrice</span>
+                <span className="legend-chip"><span className="ldot" style={{ background: 'rgba(79,172,254,0.2)' }} />Prise médicament</span>
+                <span className="legend-chip"><span className="ldot ldot-crisis" />Crise</span>
               </div>
             </>
           ) : (
-            <p className="no-data-msg">Pas encore de données pour le graphique.</p>
+            <p className="no-data-msg">Jouez quelques sessions pour voir apparaitre le graphique.</p>
           )}
         </div>
 
-        {/* Auto-analysis */}
         <div className="metrics-glass metrics-analysis-box">
           <Activity size={18} />
           <p>
             <strong>Analyse automatique :</strong>{' '}
             {impact <= 0
               ? `L'amélioration de la planification motrice coïncide avec la prise de ${lastDrug}. Les crises ont diminué de ${Math.abs(impact).toFixed(1)}% sur les 7 derniers jours.`
-              : `Augmentation de ${impact.toFixed(1)}% des crises observée. Un suivi rapproché est recommandé.`}
+              : crises.length === 0
+                ? 'Aucune crise enregistrée. Continuez le suivi pour établir une baseline fiable.'
+                : `Augmentation de ${impact.toFixed(1)}% des crises. Un suivi rapproché est recommandé.`}
+            {stats.correlation !== 0 && (
+              <> Corrélation Drug/MRT : <strong>r = {stats.correlation.toFixed(3)}</strong>
+              {Math.abs(stats.correlation) > 0.5 ? ' (significative)' : ' (faible)'}.</>
+            )}
           </p>
         </div>
       </section>
 
-      {/* ════════════════════════════════════════════════════
-          BOTTOM GRID — Gauge + Heatmap
-          ════════════════════════════════════════════════════ */}
+      {/* ═══ BOTTOM GRID ═══ */}
       <div className="metrics-bottom-grid">
-        {/* Vocal Stress Gauge */}
-        <section className="metrics-glass metrics-card-padded">
-          <div className="card-header-row">
-            <Mic size={18} />
-            <h3>Stress Vocal</h3>
-          </div>
-          <p className="card-desc">
-            Latence d'intention vocale — plus la valeur est haute, plus la fatigue neurologique est importante.
-          </p>
-          <VocalGauge value={avgVocal} maxVal={maxVocal} />
-          {baselineVocal != null && (
-            <p className="baseline-note">
-              Baseline moyenne : <strong>{baselineVocal} ms</strong>
-            </p>
-          )}
+        <section className="metrics-glass metrics-card-padded fade-in-up" style={{ animationDelay: '0.5s' }}>
+          <div className="card-header-row"><Mic size={18} /><h3>Jauge de Stress Vocal</h3></div>
+          <p className="card-desc">Latence d'intention vocale. Plus la valeur est haute, plus la fatigue neurologique est importante.</p>
+          {noiseGames.length > 0 ? (
+            <><VocalGauge value={avgVocal} maxVal={maxVocal} />
+            {baselineVocal != null && <p className="baseline-note">Baseline : <strong>{baselineVocal} ms</strong></p>}</>
+          ) : <p className="no-data-msg">Jouez au Jeu du Bruit pour collecter des données vocales.</p>}
         </section>
 
-        {/* Inhibition Heatmap (Bubble Chart) */}
-        <section className="metrics-glass metrics-card-padded">
-          <div className="card-header-row">
-            <Zap size={18} />
-            <h3>Inhibition au fil du temps</h3>
-          </div>
-          <p className="card-desc">
-            Chaque bulle représente une session. Taille = IIV score, position Y = taux d'inhibition.
-          </p>
+        <section className="metrics-glass metrics-card-padded fade-in-up" style={{ animationDelay: '0.6s' }}>
+          <div className="card-header-row"><Zap size={18} /><h3>Carte d'Inhibition</h3></div>
+          <p className="card-desc">Taille = variabilité (IIV). Couleur : vert = bonne inhibition, rouge = faible.</p>
           {inhibitionData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <ScatterChart margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fill: '#999', fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  name="Date"
-                />
-                <YAxis
-                  dataKey="rate"
-                  tick={{ fill: '#999', fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  name="Taux"
-                  domain={[0, 1]}
-                />
-                <ZAxis dataKey="iiv" range={[60, 400]} name="IIV" />
-                <Tooltip
-                  cursor={{ strokeDasharray: '3 3', stroke: '#ddd' }}
-                  contentStyle={{
-                    background: '#fff',
-                    border: '1px solid #f0f0f0',
-                    borderRadius: 12,
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                  }}
-                  labelStyle={{ color: '#1A1A1A' }}
-                  itemStyle={{ color: '#666' }}
-                />
+                <XAxis dataKey="date" tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis dataKey="rate" tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 1]} />
+                <ZAxis dataKey="iiv" range={[80, 500]} />
+                <Tooltip contentStyle={{ background: '#fff', border: '1px solid #f0f0f0', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
+                  labelStyle={{ color: '#1A1A1A' }} itemStyle={{ color: '#666' }} />
                 <Scatter name="Inhibition" data={inhibitionData}>
                   {inhibitionData.map((d, i) => (
-                    <Cell
-                      key={i}
-                      fill={d.rate >= 0.7 ? '#66BB6A' : d.rate >= 0.4 ? '#FFA726' : '#FF6B6B'}
-                      fillOpacity={0.75}
-                    />
+                    <Cell key={i} fill={d.rate >= 0.7 ? '#66BB6A' : d.rate >= 0.4 ? '#FFA726' : '#FF6B6B'} fillOpacity={0.8} />
                   ))}
                 </Scatter>
               </ScatterChart>
             </ResponsiveContainer>
-          ) : (
-            <p className="no-data-msg">Aucune session Flash Pop enregistrée.</p>
-          )}
+          ) : <p className="no-data-msg">Jouez à Flash Pop pour collecter des données d'inhibition.</p>}
         </section>
       </div>
     </div>
