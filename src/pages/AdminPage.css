@@ -1,13 +1,13 @@
 .admin-page {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(100vh - 70px);
-  padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 70px);
+    padding: 20px;
 }
 
 .admin-page h1 {
-  font-size: 2rem;
-  color: #5a8fb8;
-  font-weight: 600;
+    font-size: 2rem;
+    color: #5a8fb8;
+    font-weight: 600;
 }

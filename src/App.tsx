@@ -8,20 +8,20 @@ import FruitNinjaPage from './pages/FruitNinjaPage';
 import JeuDuBruitPage from './pages/JeuDuBruitPage';
 
 const App: React.FC = () => {
-  return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/app" element={<AppLayout />}>
-          <Route index element={<JeuxPage />} />
-          <Route path="admin" element={<AdminPage />} />
-          <Route path="jeux" element={<JeuxPage />} />
-          <Route path="jeux/fruit-ninja" element={<FruitNinjaPage />} />
-          <Route path="jeux/jeu-du-bruit" element={<JeuDuBruitPage />} />
-        </Route>
-      </Routes>
-    </Router>
-  );
+    return (
+        <Router>
+            <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/app" element={<AppLayout />}>
+                    <Route index element={<JeuxPage />} />
+                    <Route path="admin" element={<AdminPage />} />
+                    <Route path="jeux" element={<JeuxPage />} />
+                    <Route path="jeux/fruit-ninja" element={<FruitNinjaPage />} />
+                    <Route path="jeux/jeu-du-bruit" element={<JeuDuBruitPage />} />
+                </Route>
+            </Routes>
+        </Router>
+    );
 };
 
 export default App;
