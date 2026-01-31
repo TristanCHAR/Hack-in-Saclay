@@ -47,23 +47,23 @@ const JeuxPage: React.FC = () => {
           <div className="card-arrow">→</div>
         </div>
 
-                <div
-                    className="game-card jeu-du-bruit"
-                    onClick={() => navigate('/app/jeux/jeu-du-bruit')}
-                >
-                    <div className="card-image-container">
-                        <div className="sound-illustration">
-                            <div className="sound-wave" />
-                            <div className="sound-wave" />
-                            <div className="sound-wave" />
-                        </div>
-                    </div>
-                    <div className="card-content">
-                        <h2>Jeu du bruit</h2>
-                        <p>Écoute bien et retrouve les sons.</p>
-                    </div>
-                    <div className="card-arrow">→</div>
-                </div>
+        <div 
+          className="game-card jeu-du-bruit"
+          onClick={() => navigate('/app/jeux/jeu-du-bruit')}
+        >
+          <div className="card-image-container">
+            <div className="sound-illustration">
+              <div className="sound-wave" />
+              <div className="sound-wave" />
+              <div className="sound-wave" />
+            </div>
+          </div>
+          <div className="card-content">
+            <h2>NoiseGame</h2>
+            <p>Écoute bien et retrouve les sons.</p>
+          </div>
+          <div className="card-arrow">→</div>
+        </div>
             </div>
         </div>
     );

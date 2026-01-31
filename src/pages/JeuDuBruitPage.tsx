@@ -239,7 +239,7 @@ const JeuDuBruitPage: React.FC = () => {
       {gameState === 'menu' ? (
         <div className="noise-game-container">
           <div className="game-card-minimal">
-            <h1 className="game-title-minimal">Jeu du Bruit</h1>
+            <h1 className="game-title-minimal">NoiseGame</h1>
             <p className="game-subtitle-minimal">Crie ou fais du bruit pour faire sauter ton personnage !</p>
             {highScore > 0 && <p className="high-score-minimal">Record : {highScore}</p>}
             <button className="btn-primary" onClick={initGame} disabled={!isSessionActive}>
