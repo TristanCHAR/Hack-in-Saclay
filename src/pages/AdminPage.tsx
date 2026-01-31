@@ -3,8 +3,8 @@ import './AdminPage.css';
 
 const AdminPage: React.FC = () => {
     return (
-        <div className="admin-page">
-            <h1>Admin</h1>
+        <div className="admin-container">
+            <h1 className="admin-text">Admin</h1>
         </div>
     );
 };

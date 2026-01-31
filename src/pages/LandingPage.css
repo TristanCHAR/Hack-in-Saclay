@@ -3,56 +3,47 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
-    background: linear-gradient(135deg, #e8f4f8 0%, #d4e8f5 100%);
+    padding: 24px;
+    background-color: #F5F2ED;
 }
 
 .landing-content {
-    max-width: 600px;
+    max-width: 480px;
+    width: 100%;
     text-align: center;
-    background: white;
-    padding: 40px;
-    border-radius: 20px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
 .landing-title {
-    font-size: 2.5rem;
-    color: #5a8fb8;
-    margin-bottom: 20px;
-    font-weight: 600;
+    font-size: 32px;
+    font-weight: 700;
+    color: #1A1A1A;
+    margin-bottom: 16px;
+    letter-spacing: -0.02em;
 }
 
 .landing-description {
-    font-size: 1.1rem;
-    color: #4a5568;
+    font-size: 16px;
+    color: #666666;
     line-height: 1.6;
-    margin-bottom: 20px;
-}
-
-.landing-info {
-    font-size: 1rem;
-    color: #718096;
-    line-height: 1.6;
-    margin-bottom: 30px;
+    margin-bottom: 32px;
 }
 
 .landing-button {
-    background-color: #7ba8c7;
-    color: white;
+    background-color: #1A1A1A;
+    color: #FFFFFF;
     border: none;
-    padding: 15px 40px;
-    font-size: 1.1rem;
-    border-radius: 30px;
+    padding: 16px 32px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 12px;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 10px rgba(123, 168, 199, 0.3);
+    transition: all 0.2s ease;
+    width: 100%;
 }
 
 .landing-button:hover {
-    background-color: #6a97b6;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(123, 168, 199, 0.4);
+    background-color: #333333;
+    transform: translateY(-1px);
 }
 
 .landing-button:active {
@@ -60,21 +51,7 @@
 }
 
 @media (max-width: 768px) {
-    .landing-content {
-        padding: 30px 20px;
-    }
-
     .landing-title {
-        font-size: 2rem;
-    }
-
-    .landing-description,
-    .landing-info {
-        font-size: 1rem;
-    }
-
-    .landing-button {
-        padding: 12px 30px;
-        font-size: 1rem;
+        font-size: 28px;
     }
 }

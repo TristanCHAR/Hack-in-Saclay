@@ -1,57 +1,56 @@
 .jeux-page {
-    min-height: calc(100vh - 70px);
-    padding: 20px;
+    min-height: calc(100vh - 80px);
+    padding: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
+    background-color: #F5F2ED;
 }
 
 .jeux-container {
     width: 100%;
-    max-width: 600px;
+    max-width: 400px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
 }
 
 .game-card {
-    background-color: white;
-    border-radius: 15px;
-    padding: 40px;
+    background-color: #F8F9FA;
+    border-radius: 16px;
+    padding: 32px;
     text-align: center;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-    border: 2px solid #e0eff7;
+    transition: all 0.2s ease;
+    border: 1px solid #EEEEEE;
 }
 
 .game-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 15px rgba(90, 143, 184, 0.2);
-    border-color: #b8d4e8;
+    background-color: #F0F0F0;
+    transform: translateY(-2px);
 }
 
 .game-card:active {
-    transform: translateY(-1px);
+    transform: translateY(0);
 }
 
 .game-card h2 {
-    font-size: 1.5rem;
-    color: #5a8fb8;
+    font-size: 18px;
+    color: #1A1A1A;
     font-weight: 600;
     margin: 0;
 }
 
-@media (max-width: 768px) {
-    .jeux-page {
-        padding: 15px;
-    }
-
-    .game-card {
-        padding: 30px;
-    }
-
-    .game-card h2 {
-        font-size: 1.3rem;
-    }
+/* Couleurs spécifiques pour les jeux (Pastels) */
+.game-card:nth-child(1) {
+    background-color: #E3F2FD;
+    border-color: #BBDEFB;
 }
+
+/* Fruit Ninja - Bleu clair */
+.game-card:nth-child(2) {
+    background-color: #E8F5E9;
+    border-color: #C8E6C9;
+}
+
+/* Jeu du bruit - Vert pastel */

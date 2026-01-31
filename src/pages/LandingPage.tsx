@@ -41,7 +41,7 @@ const LandingPage: React.FC = () => {
     return (
         <div className="landing-container">
             <div className="landing-content">
-                <h1 className="landing-title">Jeux Cognitifs</h1>
+                <h1 className="landing-title">KidoKinetics</h1>
                 <p className="landing-description">
                     Bienvenue dans l'application de collecte de données cognitives et motrices
                     pour la recherche sur les épilepsies développementales rares pédiatriques.

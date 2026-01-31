@@ -1,4 +1,4 @@
-# Épilepsie - Jeux Cognitifs PWA
+# Épilepsie - KidoKinetics PWA
 
 Application Progressive Web App (PWA) pour collecter des données cognitives et motrices via des mini-jeux, conçue pour la recherche sur les épilepsies développementales rares pédiatriques.
 
