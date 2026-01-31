@@ -1,0 +1,12 @@
+.app-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f5f9fc;
+}
+
+.app-content {
+  flex: 1;
+  padding-bottom: 70px; /* Space for bottom nav */
+  overflow-y: auto;
+}
