@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSettings } from '../context/SettingsContext';
 import './FruitNinjaPage.css';
 
 interface Bubble {
@@ -14,11 +15,12 @@ interface Bubble {
 type GameState = 'menu' | 'playing' | 'gameOver';
 
 const FruitNinjaPage: React.FC = () => {
+    const { sessionDuration, isSessionActive, sessionStartTime } = useSettings();
     const [gameState, setGameState] = useState<GameState>('menu');
     const [score, setScore] = useState(0);
     const [bubbles, setBubbles] = useState<Bubble[]>([]);
     const [errorEffect, setErrorEffect] = useState(false);
-    const [gameTime, setGameTime] = useState(60);
+    const [gameTime, setGameTime] = useState(sessionDuration);
     const [highScore, setHighScore] = useState(0);
 
     const nextIdRef = useRef(0);
@@ -35,31 +37,39 @@ const FruitNinjaPage: React.FC = () => {
         const saved = localStorage.getItem('fruitNinjaHighScore');
         if (saved) setHighScore(parseInt(saved, 10));
 
-        // Initialisation des sons locaux
         popSoundRef.current = new Audio(process.env.PUBLIC_URL + '/assets/sounds/pop_ballon.wav');
         errorSoundRef.current = new Audio(process.env.PUBLIC_URL + '/assets/sounds/medusa.mp3');
 
-        // Préchargement
         popSoundRef.current.load();
         errorSoundRef.current.load();
     }, []);
 
     useEffect(() => {
         if (gameState !== 'playing') return;
+
+        // Si la session globale expire, on arrête le jeu
+        if (!isSessionActive) {
+            setGameState('gameOver');
+            return;
+        }
+
         const timer = setInterval(() => {
-            setGameTime((prev) => {
-                if (prev <= 1) {
-                    setGameState('gameOver');
-                    return 0;
-                }
-                return prev - 1;
-            });
+            // On met à jour le temps restant de la session pour l'affichage
+            const elapsed = (Date.now() - (sessionStartTime || Date.now())) / 1000;
+            const remaining = Math.max(0, Math.ceil(sessionDuration - elapsed));
+
+            setGameTime(remaining);
+
+            if (remaining <= 0) {
+                setGameState('gameOver');
+            }
         }, 1000);
         return () => clearInterval(timer);
-    }, [gameState]);
+    }, [gameState, isSessionActive, sessionDuration, sessionStartTime]);
 
     useEffect(() => {
         if (gameState !== 'playing') return;
+
         const spawnInterval = setInterval(() => {
             const isJellyfish = Math.random() < 0.25;
             const newBubble: Bubble = {
@@ -72,7 +82,7 @@ const FruitNinjaPage: React.FC = () => {
                 isPopping: false,
             };
             setBubbles((prev) => [...prev, newBubble]);
-        }, 1000);
+        }, 800); // Un peu plus rapide pour plus de fun
         return () => clearInterval(spawnInterval);
     }, [gameState]);
 
@@ -80,7 +90,8 @@ const FruitNinjaPage: React.FC = () => {
         if (gameState !== 'playing') return;
         const cleanupInterval = setInterval(() => {
             const now = Date.now();
-            setBubbles((prev) => prev.filter(b => (now - b.createdAt < 2500) || b.isPopping));
+            // On fait disparaître les ballons/méduses après 4 secondes
+            setBubbles((prev) => prev.filter(b => (now - b.createdAt < 4000) || b.isPopping));
         }, 100);
         return () => clearInterval(cleanupInterval);
     }, [gameState]);
@@ -108,7 +119,6 @@ const FruitNinjaPage: React.FC = () => {
             playErrorSound();
             setScore((prev) => Math.max(0, prev - 10));
             setErrorEffect(true);
-            // Animation de "choc" pour la méduse
             setBubbles((prev) => prev.map(b => b.id === bubble.id ? { ...b, isPopping: true } : b));
             setTimeout(() => {
                 setErrorEffect(false);
@@ -125,10 +135,11 @@ const FruitNinjaPage: React.FC = () => {
     };
 
     const startGame = () => {
+        if (!isSessionActive) return;
         setGameState('playing');
         setScore(0);
         setBubbles([]);
-        setGameTime(60);
+        setGameTime(sessionDuration);
         setErrorEffect(false);
         nextIdRef.current = 0;
     };
@@ -148,7 +159,9 @@ const FruitNinjaPage: React.FC = () => {
                     <h1 className="game-title-minimal">Fruit Ninja</h1>
                     <p className="game-subtitle-minimal">Cliquez sur les ballons colorés. Évitez les méduses.</p>
                     {highScore > 0 && <p className="high-score-minimal">Record : {highScore}</p>}
-                    <button className="btn-primary" onClick={startGame}>Commencer</button>
+                    <button className="btn-primary" onClick={startGame} disabled={!isSessionActive}>
+                        {isSessionActive ? 'Commencer' : 'Session expirée'}
+                    </button>
                 </div>
             </div>
         );
@@ -163,7 +176,9 @@ const FruitNinjaPage: React.FC = () => {
                         <span className="score-label">Score</span>
                         <span className="score-value">{score}</span>
                     </div>
-                    <button className="btn-primary" onClick={startGame}>Rejouer</button>
+                    <button className="btn-primary" onClick={startGame} disabled={!isSessionActive}>
+                        Rejouer
+                    </button>
                     <button className="btn-secondary" onClick={finishGame}>Retour</button>
                 </div>
             </div>
@@ -173,14 +188,11 @@ const FruitNinjaPage: React.FC = () => {
     return (
         <div className={`game-screen ${errorEffect ? 'show-error' : ''}`}>
             <div className="game-header-minimal">
-                <div className="stat-item">
-                    <span className="stat-label">Temps</span>
-                    <span className="stat-value">{gameTime}s</span>
-                </div>
-                <div className="stat-item">
+                <div className="stat-item score-stat">
                     <span className="stat-label">Score</span>
                     <span className="stat-value">{score}</span>
                 </div>
+                <button className="btn-quit-top" onClick={finishGame}>Quitter</button>
             </div>
 
             <div className="game-play-area" ref={gameAreaRef}>
@@ -219,7 +231,6 @@ const FruitNinjaPage: React.FC = () => {
                 ))}
             </div>
 
-            <button className="btn-quit" onClick={finishGame}>Quitter</button>
         </div>
     );
 };

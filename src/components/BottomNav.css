@@ -1,44 +1,54 @@
 .bottom-nav {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 80px;
-    background-color: #FFFFFF;
+    bottom: 24px;
+    left: 24px;
+    right: 24px;
+    height: 72px;
+    background-color: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 48px;
-    border-top: 1px solid #F0F0F0;
+    gap: 12px;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
     z-index: 1000;
-    padding-bottom: env(safe-area-inset-bottom);
+    padding: 0 12px;
 }
 
 .nav-item {
+    flex: 1;
+    max-width: 140px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-decoration: none;
     color: #999999;
-    transition: all 0.2s ease;
-    padding: 8px 16px;
-    border-radius: 12px;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    height: 48px;
+    border-radius: 16px;
 }
 
 .nav-item.active {
     color: #1A1A1A;
-    background-color: #F5F5F5;
+    background-color: #FFFFFF;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .nav-text {
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: -0.01em;
 }
 
 @media (max-width: 768px) {
     .bottom-nav {
-        height: 70px;
-        gap: 24px;
+        bottom: 16px;
+        left: 16px;
+        right: 16px;
+        height: 64px;
     }
 }

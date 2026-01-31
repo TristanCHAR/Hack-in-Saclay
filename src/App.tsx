@@ -1,6 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import LandingPage from './pages/LandingPage';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
 import AdminPage from './pages/AdminPage';
 import JeuxPage from './pages/JeuxPage';
@@ -11,9 +10,9 @@ const App: React.FC = () => {
     return (
         <Router>
             <Routes>
-                <Route path="/" element={<LandingPage />} />
+                <Route path="/" element={<Navigate to="/app/jeux" replace />} />
                 <Route path="/app" element={<AppLayout />}>
-                    <Route index element={<JeuxPage />} />
+                    <Route index element={<Navigate to="/app/jeux" replace />} />
                     <Route path="admin" element={<AdminPage />} />
                     <Route path="jeux" element={<JeuxPage />} />
                     <Route path="jeux/fruit-ninja" element={<FruitNinjaPage />} />
