@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, ReferenceDot,
+  ResponsiveContainer, ReferenceLine,
   ScatterChart, Scatter, ZAxis, Cell
 } from 'recharts';
 import {
@@ -35,11 +35,6 @@ interface TimelinePoint {
    MATH HELPERS
    ═══════════════════════════════════════════════════════════ */
 const toDate = (s: string) => new Date(s.replace(' ', 'T'));
-const dayOf = (s: string) => s.split(' ')[0];
-const fmtDay = (d: string) => {
-  const p = d.split('-');
-  return `${parseInt(p[2])}/${parseInt(p[1])}`;
-};
 const avg = (a: number[]) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0);
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -86,15 +81,27 @@ function adherenceCalc(drugs: Drug[]): { count: number; target: number; pct: num
 function stabilityScore(fp: FlashPop[], ng: NoiseGame[]): number {
   if (!fp.length && !ng.length) return 0;
 
+  // Ne garder que les 5 dernières sessions de chaque jeu
+  // pour éviter que l'historique ancien dilue les performances récentes
+  const RECENT = 5;
+  const recentFp = fp
+    .slice()
+    .sort((a, b) => toDate(b.created_at).getTime() - toDate(a.created_at).getTime())
+    .slice(0, RECENT);
+  const recentNg = ng
+    .slice()
+    .sort((a, b) => toDate(b.created_at).getTime() - toDate(a.created_at).getTime())
+    .slice(0, RECENT);
+
   // IIV (écart-type des temps de réaction) : 0ms = parfait, ≥300ms = instable
   // Échelle linéaire inversée sur [0, 300] → [100, 0]
-  const iiv = fp.length
-    ? clamp(100 - (avg(fp.map(f => f.iiv_score)) / 300) * 100, 0, 100)
+  const iiv = recentFp.length
+    ? clamp(100 - (avg(recentFp.map(f => f.iiv_score)) / 300) * 100, 0, 100)
     : null;
 
   // Planification motrice (air time moyen/saut) : ~400ms = bon contrôle, ≥1200ms = flottement excessif
   // Meilleur score autour de 400ms, dégradation au-delà
-  const avgMot = ng.length ? avg(ng.map(n => n.motrice_planification)) : null;
+  const avgMot = recentNg.length ? avg(recentNg.map(n => n.motrice_planification)) : null;
   const mot = avgMot !== null
     ? clamp(100 - Math.abs(avgMot - 400) / 8, 0, 100)
     : null;
@@ -118,11 +125,12 @@ const fmtTime = (d: Date) => {
 function buildTimeline(
   crises: Crise[], drugs: Drug[], fps: FlashPop[], ngs: NoiseGame[]
 ): TimelinePoint[] {
-  // Un point par session de jeu individuelle
   const points: TimelinePoint[] = [];
+  const gameTimestamps: number[] = [];
 
   for (const fp of fps) {
     const t = toDate(fp.created_at).getTime();
+    gameTimestamps.push(t);
     points.push({
       ts: t,
       label: fmtTime(toDate(fp.created_at)),
@@ -136,6 +144,7 @@ function buildTimeline(
 
   for (const ng of ngs) {
     const t = toDate(ng.created_at).getTime();
+    gameTimestamps.push(t);
     points.push({
       ts: t,
       label: fmtTime(toDate(ng.created_at)),
@@ -147,7 +156,33 @@ function buildTimeline(
     });
   }
 
-  // Tri chronologique
+  // Ajouter les drugs qui ne sont proches d'aucune session de jeu
+  for (const d of drugs) {
+    const t = toDate(d.created_at).getTime();
+    const nearGame = gameTimestamps.some(gt => Math.abs(gt - t) <= PROXIMITY_MS);
+    if (!nearGame) {
+      points.push({
+        ts: t, label: fmtTime(toDate(d.created_at)),
+        mrt: null, motrice: null, inhibition: null,
+        drugCount: 1, criseCount: crises.filter(c => Math.abs(toDate(c.created_at).getTime() - t) <= PROXIMITY_MS).length,
+      });
+    }
+  }
+
+  // Ajouter les crises qui ne sont proches d'aucune session de jeu ni d'un drug déjà ajouté
+  const allTs = points.map(p => p.ts);
+  for (const c of crises) {
+    const t = toDate(c.created_at).getTime();
+    const nearExisting = allTs.some(et => Math.abs(et - t) <= PROXIMITY_MS);
+    if (!nearExisting) {
+      points.push({
+        ts: t, label: fmtTime(toDate(c.created_at)),
+        mrt: null, motrice: null, inhibition: null,
+        drugCount: 0, criseCount: 1,
+      });
+    }
+  }
+
   points.sort((a, b) => a.ts - b.ts);
   return points;
 }
@@ -217,6 +252,7 @@ const VocalGauge: React.FC<{ value: number; maxVal: number }> = ({ value, maxVal
    ═══════════════════════════════════════════════════════════ */
 const ChartTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
+  const point = payload[0]?.payload as TimelinePoint | undefined;
   return (
     <div className="metrics-tooltip">
       <p className="tooltip-label">{label}</p>
@@ -226,6 +262,12 @@ const ChartTooltip = ({ active, payload, label }: any) => {
             {p.name}: <strong>{typeof p.value === 'number' ? p.value.toFixed(1) : p.value}</strong>
           </p>
         ) : null
+      )}
+      {point && point.drugCount > 0 && (
+        <p style={{ color: '#66BB6A', fontWeight: 700 }}>Médicament(s) : {point.drugCount}</p>
+      )}
+      {point && point.criseCount > 0 && (
+        <p style={{ color: '#FF6B6B', fontWeight: 700 }}>Crise(s) : {point.criseCount}</p>
       )}
     </div>
   );
@@ -306,7 +348,7 @@ const AnalysisPage: React.FC = () => {
 
   const inhibitionData = useMemo(() =>
     flashPops.map(fp => ({
-      date: fmtDay(dayOf(fp.created_at)),
+      date: fmtTime(toDate(fp.created_at)),
       ts: toDate(fp.created_at).getTime(),
       rate: fp.inhibition_rate,
       iiv: fp.iiv_score,
@@ -354,7 +396,7 @@ const AnalysisPage: React.FC = () => {
           <div className="brain-overlay">
             <span className="brain-score">{animStability}</span>
             <span className="brain-label">Stabilité Cognitive</span>
-            <span className="brain-explain">Score combiné de la régularité des temps de réaction (IIV) et du controle moteur vocal. 100 = parfait, 0 = instable.</span>
+            <span className="brain-explain">Basé sur les 5 dernières sessions : régularité des réactions (IIV) + contrôle moteur vocal. 100 = stable, 0 = instable.</span>
           </div>
         </div>
 
@@ -437,9 +479,6 @@ const AnalysisPage: React.FC = () => {
                   <YAxis yAxisId="right" orientation="right" tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
 
-                  {timeline.filter(t => t.drugCount > 0).map((t, i) => (
-                    <ReferenceLine key={`drug-${i}`} x={t.label} yAxisId="left" stroke="#4facfe" strokeWidth={32} strokeOpacity={0.07} />
-                  ))}
                   {baselineMrt != null && (
                     <ReferenceLine yAxisId="left" y={baselineMrt} stroke="#4facfe" strokeDasharray="6 4" strokeOpacity={0.35}
                       label={{ value: `Baseline ${baselineMrt}ms`, fill: '#4facfe', fontSize: 10, position: 'right' }} />
@@ -453,20 +492,37 @@ const AnalysisPage: React.FC = () => {
                     fill="url(#gradMotrice)" fillOpacity={1} connectNulls name="Planif. Motrice (ms)"
                     dot={{ r: 5, fill: '#9C7CFF', stroke: '#fff', strokeWidth: 2 }}
                     activeDot={{ r: 7, stroke: '#9C7CFF', strokeWidth: 2, fill: '#fff' }} />
-
-                  {timeline.filter(t => t.criseCount > 0).map((t, i) => (
-                    <ReferenceDot key={`c-${i}`} x={t.label} y={t.mrt ?? baselineMrt ?? 300}
-                      yAxisId="left" r={8} fill="#FF6B6B" stroke="#fff" strokeWidth={3} />
-                  ))}
                 </AreaChart>
               </ResponsiveContainer>
+
+              {/* Barre d'événements : médicaments et crises */}
+              <div className="events-bar">
+                {timeline.map((t, i) => (
+                  <div key={i} className="events-bar-slot">
+                    {t.drugCount > 0 && (
+                      <span className="event-pill event-drug" title={`${t.label} — ${t.drugCount} médicament(s)`}>
+                        💊 ×{t.drugCount}
+                      </span>
+                    )}
+                    {t.criseCount > 0 && (
+                      <span className="event-pill event-crise" title={`${t.label} — ${t.criseCount} crise(s)`}>
+                        ⚡ ×{t.criseCount}
+                      </span>
+                    )}
+                    {t.drugCount === 0 && t.criseCount === 0 && (
+                      <span className="event-pill event-empty" />
+                    )}
+                  </div>
+                ))}
+              </div>
+
               <div className="chart-legend-row">
                 <span className="legend-chip"><span className="ldot" style={{ background: '#4facfe' }} />MRT (temps de réaction, ms)</span>
                 <span className="legend-chip"><span className="ldot" style={{ background: '#9C7CFF' }} />Planif. Motrice (durée en l'air, ms)</span>
-                <span className="legend-chip"><span className="ldot" style={{ background: 'rgba(79,172,254,0.2)' }} />Prise médicament</span>
-                <span className="legend-chip"><span className="ldot ldot-crisis" />Crise</span>
+                <span className="legend-chip"><span className="ldot" style={{ background: '#66BB6A' }} />💊 Prise médicament</span>
+                <span className="legend-chip"><span className="ldot ldot-crisis" />⚡ Crise</span>
               </div>
-              <p className="chart-explain">Ce graphique montre l'évolution session par session. La courbe bleue (MRT) indique la vitesse de réaction cognitive. La courbe violette mesure le controle moteur vocal. Les bandes bleu clair signalent une prise de médicament à proximité (&plusmn;30 min). Les points rouges marquent une crise déclarée.</p>
+              <p className="chart-explain">Ce graphique montre l'évolution session par session. La courbe bleue (MRT) indique la vitesse de réaction cognitive. La courbe violette mesure le contrôle moteur vocal. La barre d'événements sous le graphique affiche les prises de médicaments (💊 vert) et les crises (⚡ rouge) à proximité de chaque session (±30 min), ou de manière autonome si aucun jeu n'a eu lieu à ce moment.</p>
             </>
           ) : (
             <p className="no-data-msg">Jouez quelques sessions pour voir apparaitre le graphique.</p>
