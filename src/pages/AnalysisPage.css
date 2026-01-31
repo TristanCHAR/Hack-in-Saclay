@@ -1,0 +1,423 @@
+.analysis-container {
+  min-height: calc(100vh - 80px);
+  padding: 40px 24px;
+  background: radial-gradient(circle at top left, #FFF9F2 0%, #FDFCFB 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Glassmorphism Cards */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+}
+
+/* 1. Header: KPIs */
+.vital-signs-header {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.kpi-card {
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.kpi-icon-wrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.med-icon {
+  background: rgba(160, 196, 255, 0.15);
+  color: #4facfe;
+}
+
+.seizure-icon {
+  background: rgba(255, 107, 107, 0.15);
+  color: #FF6B6B;
+}
+
+.progress-icon {
+  background: rgba(129, 199, 132, 0.15);
+  color: #66BB6A;
+}
+
+.kpi-content {
+  flex: 1;
+}
+
+.kpi-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.kpi-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.kpi-value {
+  font-size: 28px;
+  font-weight: 900;
+  color: #1A1A1A;
+  letter-spacing: -0.02em;
+}
+
+.kpi-sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: #999;
+}
+
+.kpi-progress-bar {
+  height: 6px;
+  background: #F0F0F0;
+  border-radius: 10px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4facfe, #00f2fe);
+  border-radius: 10px;
+}
+
+.pulse-red {
+  animation: pulseRed 2s infinite;
+}
+
+@keyframes pulseRed {
+
+  0%,
+  100% {
+    color: #FF6B6B;
+  }
+
+  50% {
+    color: #FF0000;
+  }
+}
+
+.trend-green {
+  color: #66BB6A;
+}
+
+.kpi-argument {
+  font-size: 11px;
+  font-weight: 600;
+  color: #999;
+  margin-top: 8px;
+  line-height: 1.3;
+}
+
+/* 2. Main Layout */
+.analysis-main-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 32px;
+}
+
+.insight-engine-section {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.section-header h2 {
+  font-size: 24px;
+  font-weight: 900;
+  color: #1A1A1A;
+  letter-spacing: -0.03em;
+}
+
+.section-subtitle {
+  font-size: 15px;
+  color: #999;
+  font-weight: 500;
+}
+
+.chart-container {
+  padding: 32px;
+  position: relative;
+}
+
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #666;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dot.perf {
+  background: #4facfe;
+}
+
+.dot.med {
+  background: rgba(160, 196, 255, 0.3);
+}
+
+.dot.seizure {
+  background: #FF6B6B;
+}
+
+.insight-wow {
+  margin-top: 32px;
+  padding: 20px;
+  background: rgba(79, 172, 254, 0.05);
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #4facfe;
+  text-align: center;
+  line-height: 1.5;
+  border: 1px dashed rgba(79, 172, 254, 0.2);
+}
+
+/* 3 & 4. Sidebar */
+.analysis-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sidebar-module {
+  padding: 24px;
+}
+
+.module-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.module-header h3 {
+  font-size: 18px;
+  font-weight: 900;
+  color: #1A1A1A;
+  letter-spacing: -0.02em;
+}
+
+.btn-icon-add {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #1A1A1A;
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.med-chrono-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.med-chrono-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #F8F9FA;
+}
+
+.med-chrono-item.taken {
+  border-left: 4px solid #66BB6A;
+}
+
+.med-chrono-item.pending {
+  border-left: 4px solid #DDD;
+  opacity: 0.6;
+}
+
+.med-status-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.taken .med-status-badge {
+  background: #E8F5E9;
+  color: #66BB6A;
+}
+
+.pending .med-status-badge {
+  border: 2px solid #DDD;
+}
+
+.med-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.med-time {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1A1A1A;
+}
+
+.med-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #999;
+}
+
+/* Emergency Tracker */
+.emergency-tracker-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0;
+}
+
+.btn-emergency-log {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: none;
+  background: #FF6B6B;
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3), inset 0 -4px 0 rgba(0, 0, 0, 0.1);
+  transition: transform 0.1s;
+}
+
+.btn-emergency-log:active {
+  transform: scale(0.95);
+}
+
+.hold-progress {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  border-radius: 50%;
+  border: 4px solid transparent;
+  border-top-color: #FF6B6B;
+  opacity: 0;
+}
+
+.btn-emergency-log:active .hold-progress {
+  animation: rotate 1s linear infinite, fadeIn 0.2s forwards;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hold-hint {
+  font-size: 12px;
+  font-weight: 700;
+  color: #FF6B6B;
+}
+
+.post-seizure-types {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.type-icon-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 4px;
+  background: #F8F9FA;
+  border: 1px solid #F0F0F0;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.type-icon-btn span {
+  font-size: 9px;
+  font-weight: 800;
+  color: #999;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.type-icon-btn:hover {
+  background: #FFF5F5;
+  border-color: #FF6B6B;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .analysis-main-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-sidebar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .analysis-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .vital-signs-header {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,178 @@
+.noise-game-container {
+  min-height: calc(100vh - 80px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(circle at top left, #F0F7FF 0%, #FDFCFB 100%);
+}
+
+.noise-game-screen {
+  position: relative;
+  height: calc(100vh - 80px);
+  width: 100%;
+  background: linear-gradient(180deg, #FDFCFB 0%, #E3F2FD 100%);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.game-play-zone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-world {
+  position: relative;
+  width: 100%;
+  height: 100px;
+  /* Hauteur de la zone de marche */
+  margin-top: 150px;
+  /* Positionne la ligne de marche au milieu/bas */
+}
+
+/* Personnage */
+.character {
+  position: absolute;
+  left: 100px;
+  bottom: 100%;
+  /* S'appuie sur le haut du game-world (le sol) */
+  width: 44px;
+  height: 44px;
+  z-index: 100;
+  margin-bottom: 0;
+}
+
+.char-body {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(79, 172, 254, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.char-eyes {
+  width: 24px;
+  height: 6px;
+  display: flex;
+  justify-content: space-around;
+}
+
+.char-eyes::before,
+.char-eyes::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+}
+
+.character.jumping .char-body {
+  transform: scale(0.9, 1.1);
+}
+
+.character.floating .char-body {
+  animation: floatWobble 0.3s infinite ease-in-out;
+  box-shadow: 0 12px 30px rgba(79, 172, 254, 0.6);
+}
+
+@keyframes floatWobble {
+
+  0%,
+  100% {
+    transform: scale(1.05, 0.95);
+  }
+
+  50% {
+    transform: scale(0.95, 1.05);
+  }
+}
+
+/* Plateformes */
+.platform {
+  position: absolute;
+  top: 0;
+  height: 600px;
+  /* Très haute pour remplir le bas */
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.02);
+}
+
+/* HUD */
+.volume-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.volume-bar-bg {
+  width: 8px;
+  height: 32px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.volume-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #4facfe;
+  transition: height 0.1s ease-out;
+}
+
+.noise-hint {
+  position: absolute;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  padding: 10px 20px;
+  border-radius: 100px;
+  font-weight: 800;
+  color: #4facfe;
+  font-size: 13px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+  animation: float 2s infinite ease-in-out;
+  pointer-events: none;
+  z-index: 200;
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translate(-50%, 0);
+  }
+
+  50% {
+    transform: translate(-50%, -8px);
+  }
+}
+
+@media (max-width: 768px) {
+  .game-world {
+    margin-top: 100px;
+  }
+
+  .character {
+    left: 60px;
+    width: 38px;
+    height: 38px;
+  }
+}
