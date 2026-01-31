@@ -176,6 +176,16 @@
   color: #999;
 }
 
+.brain-explain {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: #aaa;
+  max-width: 260px;
+  margin: 4px auto 0;
+  line-height: 1.4;
+}
+
 /* ── KPI Strip (vertical in hero) ── */
 .metrics-kpi-strip {
   display: flex;
@@ -336,6 +346,18 @@
   background: #FF6B6B;
   border: 2px solid #fff;
   box-shadow: 0 0 0 1px #FF6B6B;
+}
+
+.chart-explain {
+  font-size: 11px;
+  color: #999;
+  line-height: 1.6;
+  margin-top: 14px;
+  padding: 0 4px;
+}
+
+.stat-chip[title] {
+  cursor: help;
 }
 
 /* ── Tooltip ── */

@@ -354,6 +354,7 @@ const AnalysisPage: React.FC = () => {
           <div className="brain-overlay">
             <span className="brain-score">{animStability}</span>
             <span className="brain-label">Stabilité Cognitive</span>
+            <span className="brain-explain">Score combiné de la régularité des temps de réaction (IIV) et du controle moteur vocal. 100 = parfait, 0 = instable.</span>
           </div>
         </div>
 
@@ -367,7 +368,7 @@ const AnalysisPage: React.FC = () => {
               <span className={`kpi-value ${impact <= 0 ? 'text-green' : 'text-red'}`}>
                 {impact > 0 ? '+' : ''}{animImpact.toFixed(1)}%
               </span>
-              <span className="kpi-hint">7j vs 7j précédents</span>
+              <span className="kpi-hint">Variation du nombre de crises entre les 7 derniers jours et les 7 jours d'avant. Négatif = amélioration.</span>
             </div>
           </div>
 
@@ -377,6 +378,7 @@ const AnalysisPage: React.FC = () => {
               <span className="kpi-label">Adhérence Traitement</span>
               <span className="kpi-value">{adh.count}<span className="kpi-frac">/{adh.target}</span></span>
               <div className="kpi-bar"><div className="kpi-bar-fill" style={{ width: `${adh.pct}%` }} /></div>
+              <span className="kpi-hint">Nombre de prises de médicament enregistrées sur 7 jours, vs l'objectif de {adh.target} prises/semaine.</span>
             </div>
           </div>
 
@@ -385,7 +387,7 @@ const AnalysisPage: React.FC = () => {
             <div className="kpi-body">
               <span className="kpi-label">MRT Moyen</span>
               <span className="kpi-value">{animMrt}<span className="kpi-frac"> ms</span></span>
-              <span className="kpi-hint">{stats.mrtStdDev > 0 ? `σ = ${stats.mrtStdDev.toFixed(1)}` : 'En attente'}</span>
+              <span className="kpi-hint">Mean Reaction Time : temps de réaction moyen pour cliquer un ballon dans Flash Pop. {stats.mrtStdDev > 0 ? `Écart-type (σ) = ${stats.mrtStdDev.toFixed(1)} ms.` : 'En attente de données.'}</span>
             </div>
           </div>
         </div>
@@ -393,14 +395,22 @@ const AnalysisPage: React.FC = () => {
 
       {/* ═══ STATS BANNER ═══ */}
       <div className="stats-banner fade-in-up" style={{ animationDelay: '0.35s' }}>
-        <div className="stat-chip"><span className="stat-label-mini">n =</span><span className="stat-val-mini">{stats.totalDataPoints}</span></div>
-        <div className="stat-chip">
+        <div className="stat-chip" title="Nombre total d'enregistrements (crises + médicaments + sessions de jeu)">
+          <span className="stat-label-mini">n =</span><span className="stat-val-mini">{stats.totalDataPoints}</span>
+        </div>
+        <div className="stat-chip" title="Corrélation de Pearson entre le nombre de prises de médicament et le temps de réaction moyen par jour. Proche de -1 = le traitement réduit le MRT.">
           <span className="stat-label-mini">r(Drug,MRT) =</span>
           <span className={`stat-val-mini ${Math.abs(stats.correlation) > 0.3 ? 'text-green' : ''}`}>{stats.correlation.toFixed(3)}</span>
         </div>
-        <div className="stat-chip"><span className="stat-label-mini">σ MRT =</span><span className="stat-val-mini">{stats.mrtStdDev.toFixed(1)}</span></div>
-        <div className="stat-chip"><span className="stat-label-mini">σ Motrice =</span><span className="stat-val-mini">{stats.motriceStdDev.toFixed(1)}</span></div>
-        <div className="stat-chip"><span className="stat-label-mini">Inhib. moy =</span><span className="stat-val-mini">{(stats.inhibMean * 100).toFixed(0)}%</span></div>
+        <div className="stat-chip" title="Écart-type du temps de réaction moyen entre les sessions. Plus c'est bas, plus les performances sont régulières.">
+          <span className="stat-label-mini">σ MRT =</span><span className="stat-val-mini">{stats.mrtStdDev.toFixed(1)}</span>
+        </div>
+        <div className="stat-chip" title="Écart-type de la planification motrice entre les sessions. Plus c'est bas, plus le controle moteur est stable.">
+          <span className="stat-label-mini">σ Motrice =</span><span className="stat-val-mini">{stats.motriceStdDev.toFixed(1)}</span>
+        </div>
+        <div className="stat-chip" title="Taux d'inhibition moyen : capacité à ne pas cliquer sur les méduses dans Flash Pop. 100% = aucune méduse cliquée.">
+          <span className="stat-label-mini">Inhib. moy =</span><span className="stat-val-mini">{(stats.inhibMean * 100).toFixed(0)}%</span>
+        </div>
       </div>
 
       {/* ═══ MASTER CORRELATION CHART ═══ */}
@@ -451,11 +461,12 @@ const AnalysisPage: React.FC = () => {
                 </AreaChart>
               </ResponsiveContainer>
               <div className="chart-legend-row">
-                <span className="legend-chip"><span className="ldot" style={{ background: '#4facfe' }} />MRT</span>
-                <span className="legend-chip"><span className="ldot" style={{ background: '#9C7CFF' }} />Planif. Motrice</span>
+                <span className="legend-chip"><span className="ldot" style={{ background: '#4facfe' }} />MRT (temps de réaction, ms)</span>
+                <span className="legend-chip"><span className="ldot" style={{ background: '#9C7CFF' }} />Planif. Motrice (durée en l'air, ms)</span>
                 <span className="legend-chip"><span className="ldot" style={{ background: 'rgba(79,172,254,0.2)' }} />Prise médicament</span>
                 <span className="legend-chip"><span className="ldot ldot-crisis" />Crise</span>
               </div>
+              <p className="chart-explain">Ce graphique montre l'évolution session par session. La courbe bleue (MRT) indique la vitesse de réaction cognitive. La courbe violette mesure le controle moteur vocal. Les bandes bleu clair signalent une prise de médicament à proximité (&plusmn;30 min). Les points rouges marquent une crise déclarée.</p>
             </>
           ) : (
             <p className="no-data-msg">Jouez quelques sessions pour voir apparaitre le graphique.</p>
@@ -483,7 +494,7 @@ const AnalysisPage: React.FC = () => {
       <div className="metrics-bottom-grid">
         <section className="metrics-glass metrics-card-padded fade-in-up" style={{ animationDelay: '0.5s' }}>
           <div className="card-header-row"><Mic size={18} /><h3>Jauge de Stress Vocal</h3></div>
-          <p className="card-desc">Latence d'intention vocale. Plus la valeur est haute, plus la fatigue neurologique est importante.</p>
+          <p className="card-desc">Temps moyen entre l'approche d'un obstacle et le cri du joueur dans le Jeu du Bruit. Une valeur haute indique un temps de réaction vocal lent (fatigue ou difficulté de planification).</p>
           {noiseGames.length > 0 ? (
             <><VocalGauge value={avgVocal} maxVal={maxVocal} />
             {baselineVocal != null && <p className="baseline-note">Baseline : <strong>{baselineVocal} ms</strong></p>}</>
@@ -492,7 +503,7 @@ const AnalysisPage: React.FC = () => {
 
         <section className="metrics-glass metrics-card-padded fade-in-up" style={{ animationDelay: '0.6s' }}>
           <div className="card-header-row"><Zap size={18} /><h3>Carte d'Inhibition</h3></div>
-          <p className="card-desc">Taille = variabilité (IIV). Couleur : vert = bonne inhibition, rouge = faible.</p>
+          <p className="card-desc">Chaque point = une session Flash Pop. Axe Y = taux d'inhibition (capacité à éviter les méduses, 1.0 = parfait). Taille du point = variabilité intra-individuelle (IIV, écart-type des temps de réaction). Vert = bonne inhibition (&ge;70%), orange = modérée, rouge = faible (&lt;40%).</p>
           {inhibitionData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <ScatterChart margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
