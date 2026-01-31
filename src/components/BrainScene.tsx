@@ -1,6 +1,7 @@
 import React, { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Points, PointMaterial } from '@react-three/drei';
+// @ts-ignore — pnpm symlinks prevent TS from resolving @types/three
 import * as THREE from 'three';
 
 /* ── Particle Brain Cloud ── */
