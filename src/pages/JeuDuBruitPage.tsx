@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { api } from '../services/api';
 import './JeuDuBruitPage.css';
@@ -12,7 +13,33 @@ interface Platform {
 
 type GameState = 'menu' | 'playing' | 'gameOver';
 
+// Composant pour l'écran de fin
+const GameOverScreenWrapper: React.FC<{ score: number; navigate: any }> = ({ score, navigate }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      navigate('/app/jeux');
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [navigate]);
+
+  return (
+    <div className="noise-game-container">
+      <div className="game-card-minimal">
+        <h2 className="game-title-minimal">🎉 Bravo !</h2>
+        <p className="game-subtitle-minimal">Vous avez fait :</p>
+        <div className="score-box" style={{ margin: '20px 0' }}>
+          <span className="score-value" style={{ fontSize: '3rem', color: '#4facfe' }}>{score}</span>
+          <span className="score-label" style={{ fontSize: '1.5rem' }}>points</span>
+        </div>
+        <p className="game-subtitle-minimal" style={{ marginTop: '20px', opacity: 0.7 }}>À la prochaine ! 👋</p>
+        <p style={{ fontSize: '0.85rem', opacity: 0.5, marginTop: '10px' }}>Redirection automatique...</p>
+      </div>
+    </div>
+  );
+};
+
 const JeuDuBruitPage: React.FC = () => {
+  const navigate = useNavigate();
   const { isSessionActive, sessionDuration, sessionStartTime } = useSettings();
   const [gameState, setGameState] = useState<GameState>('menu');
   const [score, setScore] = useState(0);
@@ -59,6 +86,13 @@ const JeuDuBruitPage: React.FC = () => {
     return () => stopAudio();
   }, []);
 
+  // Vérifier si la session expire pendant le jeu
+  useEffect(() => {
+    if (gameState === 'playing' && !isSessionActive) {
+      endGame();
+    }
+  }, [gameState, isSessionActive]);
+
   const startAudio = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -88,28 +122,28 @@ const JeuDuBruitPage: React.FC = () => {
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-  const checkVolume = () => {
-    if (!analyserRef.current) return;
-    analyserRef.current.getByteFrequencyData(dataArray);
-    
-    let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-      sum += dataArray[i];
-    }
-    const avg = sum / dataArray.length;
-    
-    setVolume(avg);
-    
-    // Saut si bruit > seuil ET personnage au sol (avec une marge de tolérance)
-    if (avg > VOLUME_THRESHOLD && !isJumping) {
-      velocityYRef.current = JUMP_FORCE;
-      setIsJumping(true);
-      jumpCountRef.current++;
-      airTimeStartRef.current = Date.now();
-    }
-    
-    audioRequestRef.current = requestAnimationFrame(checkVolume);
-  };
+      const checkVolume = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(dataArray);
+
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i];
+        }
+        const avg = sum / dataArray.length;
+
+        setVolume(avg);
+
+        // Saut si bruit > seuil ET personnage au sol (avec une marge de tolérance)
+        if (avg > VOLUME_THRESHOLD && !isJumping) {
+          velocityYRef.current = JUMP_FORCE;
+          setIsJumping(true);
+          jumpCountRef.current++;
+          airTimeStartRef.current = Date.now();
+        }
+
+        audioRequestRef.current = requestAnimationFrame(checkVolume);
+      };
 
       checkVolume();
     } catch (err) {
@@ -213,7 +247,7 @@ const JeuDuBruitPage: React.FC = () => {
       // Nouvelle hauteur aléatoire entre -80 et 80
       const lastY = lastPlat.y;
       const newY = Math.max(-150, Math.min(150, lastY + (Math.random() * 160 - 80)));
-      
+
       const newPlat = {
         id: nextPlatformIdRef.current++,
         x: lastPlat.x + lastPlat.width + gap,
@@ -291,17 +325,7 @@ const JeuDuBruitPage: React.FC = () => {
           </div>
         </div>
       ) : gameState === 'gameOver' ? (
-        <div className="noise-game-container">
-          <div className="game-card-minimal">
-            <h2 className="game-title-minimal">Oups !</h2>
-            <div className="score-box">
-              <span className="score-label">Score</span>
-              <span className="score-value">{score}</span>
-            </div>
-            <button className="btn-primary" onClick={initGame} disabled={!isSessionActive}>Rejouer</button>
-            <button className="btn-secondary" onClick={() => setGameState('menu')}>Menu</button>
-          </div>
-        </div>
+        <GameOverScreenWrapper score={score} navigate={navigate} />
       ) : (
         <div className="game-play-zone">
           <div className="game-world">
@@ -315,10 +339,10 @@ const JeuDuBruitPage: React.FC = () => {
             </div>
 
             {platforms.map(plat => (
-              <div 
+              <div
                 key={plat.id}
                 className="platform"
-                style={{ 
+                style={{
                   left: `${plat.x - scrollXRef.current}px`,
                   width: `${plat.width}px`,
                   top: `${plat.y}px`
