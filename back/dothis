@@ -1,0 +1,5 @@
+crise_history duration created_at
+drug_history name created_at
+
+flash_pop_history mrt inhibition_rate iiv_score
+noise_game_history vocal_initention_latence motrice_planification
