@@ -199,12 +199,8 @@ const FruitNinjaPage: React.FC = () => {
     const mrt = reactionTimesRef.current.length > 0
       ? reactionTimesRef.current.reduce((a, b) => a + b, 0) / reactionTimesRef.current.length
       : 0;
-<<<<<<< HEAD
 
     const totalFruitTargets = hitsRef.current + missesRef.current;
-    const inhibition_rate = totalFruitTargets > 0 ? hitsRef.current / totalFruitTargets : 0;
-
-=======
     
     // Inhibition = capacité à ne PAS cliquer sur les méduses
     // 1.0 = parfait (aucune méduse cliquée), 0.0 = toutes les méduses cliquées
@@ -212,7 +208,6 @@ const FruitNinjaPage: React.FC = () => {
       ? 1 - (jellyfishHitsRef.current / jellyfishTotalRef.current)
       : 1;
     
->>>>>>> 00dadde (refactor(BrainScene): simplify color logic and update camera position)
     // IIV (Intra-Individual Variability) : écart-type des temps de réaction
     let iiv_score = 0;
     if (reactionTimesRef.current.length > 1) {
