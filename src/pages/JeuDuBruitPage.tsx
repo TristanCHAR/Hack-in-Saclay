@@ -72,6 +72,13 @@ const JeuDuBruitPage: React.FC = () => {
   const totalAirTimeRef = useRef(0);
   const airTimeStartRef = useRef<number | null>(null);
 
+  // Latence de réaction vocale : temps entre détection d'un gap et le saut
+  const gapDetectedTimeRef = useRef<number | null>(null);
+  const reactionLatenciesRef = useRef<number[]>([]);
+
+  // Ref miroir pour éviter le stale closure sur isJumping dans le RAF audio
+  const isJumpingRef = useRef(false);
+
   // Constantes CALIBRÉES
   const JUMP_FORCE = -18;
   const MAX_HEIGHT = -250; // Limite de hauteur
@@ -122,28 +129,36 @@ const JeuDuBruitPage: React.FC = () => {
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-      const checkVolume = () => {
-        if (!analyserRef.current) return;
-        analyserRef.current.getByteFrequencyData(dataArray);
+  const checkVolume = () => {
+    if (!analyserRef.current) return;
+    analyserRef.current.getByteFrequencyData(dataArray);
+    
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      sum += dataArray[i];
+    }
+    const avg = sum / dataArray.length;
+    
+    setVolume(avg);
+    
+    // Saut si bruit > seuil ET personnage au sol (ref pour éviter stale closure)
+    if (avg > VOLUME_THRESHOLD && !isJumpingRef.current) {
+      velocityYRef.current = JUMP_FORCE;
+      isJumpingRef.current = true;
+      setIsJumping(true);
+      jumpCountRef.current++;
+      airTimeStartRef.current = Date.now();
 
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
-        }
-        const avg = sum / dataArray.length;
-
-        setVolume(avg);
-
-        // Saut si bruit > seuil ET personnage au sol (avec une marge de tolérance)
-        if (avg > VOLUME_THRESHOLD && !isJumping) {
-          velocityYRef.current = JUMP_FORCE;
-          setIsJumping(true);
-          jumpCountRef.current++;
-          airTimeStartRef.current = Date.now();
-        }
-
-        audioRequestRef.current = requestAnimationFrame(checkVolume);
-      };
+      // Mesure de latence vocale : temps entre détection du gap et ce saut
+      if (gapDetectedTimeRef.current !== null) {
+        const latency = Date.now() - gapDetectedTimeRef.current;
+        reactionLatenciesRef.current.push(latency);
+        gapDetectedTimeRef.current = null;
+      }
+    }
+    
+    audioRequestRef.current = requestAnimationFrame(checkVolume);
+  };
 
       checkVolume();
     } catch (err) {
@@ -170,6 +185,9 @@ const JeuDuBruitPage: React.FC = () => {
     gameStartTimeRef.current = Date.now();
     totalAirTimeRef.current = 0;
     airTimeStartRef.current = null;
+    gapDetectedTimeRef.current = null;
+    reactionLatenciesRef.current = [];
+    isJumpingRef.current = false;
     setScore(0);
     scrollXRef.current = 0;
     charYRef.current = 0;
@@ -223,10 +241,25 @@ const JeuDuBruitPage: React.FC = () => {
           charYRef.current = plat.y;
           velocityYRef.current = 0;
           onPlatform = true;
+          isJumpingRef.current = false;
           setIsJumping(false);
           if (airTimeStartRef.current !== null) {
             totalAirTimeRef.current += Date.now() - airTimeStartRef.current;
             airTimeStartRef.current = null;
+          }
+          break;
+        }
+      }
+    }
+
+    // 3b. Détection de gap imminent pour mesurer la latence de réaction
+    if (onPlatform && gapDetectedTimeRef.current === null) {
+      for (const plat of platformsRef.current) {
+        if (absoluteCharX >= plat.x && absoluteCharX <= plat.x + plat.width) {
+          const distToEdge = (plat.x + plat.width) - absoluteCharX;
+          // Gap détecté quand le joueur est à moins de 300px du bord de plateforme
+          if (distToEdge < 300 && distToEdge > 0) {
+            gapDetectedTimeRef.current = Date.now();
           }
           break;
         }
@@ -279,9 +312,15 @@ const JeuDuBruitPage: React.FC = () => {
     stopAudio();
 
     // Calcul des métriques
-    const gameDuration = Date.now() - gameStartTimeRef.current;
     const jumps = jumpCountRef.current;
-    const vocal_initention_latence = jumps > 0 ? Math.round(gameDuration / jumps) : 0;
+    const latencies = reactionLatenciesRef.current;
+
+    // Latence vocale = temps moyen de réaction entre détection d'un gap et le saut
+    const vocal_initention_latence = latencies.length > 0
+      ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
+      : 0;
+
+    // Planification motrice = durée moyenne en l'air par saut
     const motrice_planification = jumps > 0 ? Math.round(totalAirTimeRef.current / jumps) : 0;
 
     try {

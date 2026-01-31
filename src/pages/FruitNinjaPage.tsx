@@ -31,6 +31,7 @@ const FruitNinjaPage: React.FC = () => {
   const hitsRef = useRef(0);
   const missesRef = useRef(0);
   const jellyfishHitsRef = useRef(0);
+  const jellyfishTotalRef = useRef(0);
 
   const nextIdRef = useRef(0);
   const gameAreaRef = useRef<HTMLDivElement>(null);
@@ -89,8 +90,8 @@ const FruitNinjaPage: React.FC = () => {
   useEffect(() => {
     if (gameState !== 'playing' || finishedRef.current) return;
     const spawnInterval = setInterval(() => {
-      if (finishedRef.current) return;
       const isJellyfish = Math.random() < 0.25;
+      if (isJellyfish) jellyfishTotalRef.current++;
       const newBubble: Bubble = {
         id: nextIdRef.current++,
         x: 20 + Math.random() * 60,
@@ -175,7 +176,12 @@ const FruitNinjaPage: React.FC = () => {
     hitsRef.current = 0;
     missesRef.current = 0;
     jellyfishHitsRef.current = 0;
+<<<<<<< HEAD
 
+=======
+    jellyfishTotalRef.current = 0;
+    
+>>>>>>> 00dadde (refactor(BrainScene): simplify color logic and update camera position)
     setGameState('playing');
     setScore(0);
     setBubbles([]);
@@ -193,10 +199,20 @@ const FruitNinjaPage: React.FC = () => {
     const mrt = reactionTimesRef.current.length > 0
       ? reactionTimesRef.current.reduce((a, b) => a + b, 0) / reactionTimesRef.current.length
       : 0;
+<<<<<<< HEAD
 
     const totalFruitTargets = hitsRef.current + missesRef.current;
     const inhibition_rate = totalFruitTargets > 0 ? hitsRef.current / totalFruitTargets : 0;
 
+=======
+    
+    // Inhibition = capacité à ne PAS cliquer sur les méduses
+    // 1.0 = parfait (aucune méduse cliquée), 0.0 = toutes les méduses cliquées
+    const inhibition_rate = jellyfishTotalRef.current > 0
+      ? 1 - (jellyfishHitsRef.current / jellyfishTotalRef.current)
+      : 1;
+    
+>>>>>>> 00dadde (refactor(BrainScene): simplify color logic and update camera position)
     // IIV (Intra-Individual Variability) : écart-type des temps de réaction
     let iiv_score = 0;
     if (reactionTimesRef.current.length > 1) {

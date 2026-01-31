@@ -25,12 +25,6 @@ const BrainParticles: React.FC<{ stability: number; dataCount: number }> = ({
     return pos;
   }, [dataCount]);
 
-  const color = useMemo(() => {
-    if (stability > 65) return '#4facfe';
-    if (stability > 35) return '#FFA726';
-    return '#FF6B6B';
-  }, [stability]);
-
   useFrame((state) => {
     if (!ref.current) return;
     ref.current.rotation.y += 0.003;
@@ -43,12 +37,12 @@ const BrainParticles: React.FC<{ stability: number; dataCount: number }> = ({
     <Points ref={ref} positions={positions} stride={3}>
       <PointMaterial
         transparent
-        color={color}
+        color="#1A1A1A"
         size={0.04}
         sizeAttenuation
         depthWrite={false}
         opacity={0.75}
-        blending={THREE.AdditiveBlending}
+        blending={THREE.NormalBlending}
       />
     </Points>
   );
@@ -116,7 +110,7 @@ const BrainScene: React.FC<BrainSceneProps> = ({
 }) => {
   return (
     <Canvas
-      camera={{ position: [0, 0, 4.5], fov: 50 }}
+      camera={{ position: [0, 0, 5.5], fov: 50 }}
       style={{ background: 'transparent' }}
       dpr={[1, 2]}
     >

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 
 export interface MedicationLog {
@@ -95,11 +95,23 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const isSessionActive = useMemo(() => {
+  const computeActive = useCallback(() => {
     if (!sessionStartTime) return true;
     const elapsed = (Date.now() - sessionStartTime) / 1000;
     return elapsed < sessionDuration;
   }, [sessionStartTime, sessionDuration]);
+
+  const [isSessionActive, setIsSessionActive] = useState(computeActive);
+
+  // Re-évalue chaque seconde tant qu'une session tourne
+  useEffect(() => {
+    setIsSessionActive(computeActive());
+    if (!sessionStartTime) return;
+    const id = setInterval(() => {
+      setIsSessionActive(computeActive());
+    }, 1000);
+    return () => clearInterval(id);
+  }, [computeActive, sessionStartTime]);
 
   return (
     <SettingsContext.Provider value={{ 

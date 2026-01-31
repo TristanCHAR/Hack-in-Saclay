@@ -23,7 +23,7 @@ interface NoiseGame { id: number; vocal_initention_latence: number; motrice_plan
 
 interface TimelinePoint {
   label: string;
-  date: string;
+  ts: number;
   mrt: number | null;
   motrice: number | null;
   drugCount: number;
@@ -85,28 +85,71 @@ function adherenceCalc(drugs: Drug[]): { count: number; target: number; pct: num
 
 function stabilityScore(fp: FlashPop[], ng: NoiseGame[]): number {
   if (!fp.length && !ng.length) return 0;
-  const iiv = fp.length ? clamp(100 - avg(fp.map(f => f.iiv_score)) * 2, 0, 100) : 50;
-  const mot = ng.length ? clamp(100 - (avg(ng.map(n => n.motrice_planification)) - 80) / 3.5, 0, 100) : 50;
-  return Math.round(0.5 * iiv + 0.5 * mot);
+
+  // IIV (écart-type des temps de réaction) : 0ms = parfait, ≥300ms = instable
+  // Échelle linéaire inversée sur [0, 300] → [100, 0]
+  const iiv = fp.length
+    ? clamp(100 - (avg(fp.map(f => f.iiv_score)) / 300) * 100, 0, 100)
+    : null;
+
+  // Planification motrice (air time moyen/saut) : ~400ms = bon contrôle, ≥1200ms = flottement excessif
+  // Meilleur score autour de 400ms, dégradation au-delà
+  const avgMot = ng.length ? avg(ng.map(n => n.motrice_planification)) : null;
+  const mot = avgMot !== null
+    ? clamp(100 - Math.abs(avgMot - 400) / 8, 0, 100)
+    : null;
+
+  // Moyenne pondérée uniquement sur les métriques disponibles
+  if (iiv !== null && mot !== null) return Math.round(0.5 * iiv + 0.5 * mot);
+  if (iiv !== null) return Math.round(iiv);
+  return Math.round(mot!);
 }
+
+// Fenêtre de proximité pour associer drugs/crises à une session de jeu (±30 min)
+const PROXIMITY_MS = 30 * 60 * 1000;
+
+const fmtTime = (d: Date) => {
+  const dd = d.getDate(), mm = d.getMonth() + 1;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${dd}/${mm} ${hh}:${mi}`;
+};
 
 function buildTimeline(
   crises: Crise[], drugs: Drug[], fps: FlashPop[], ngs: NoiseGame[]
 ): TimelinePoint[] {
-  const days = new Set<string>();
-  [...crises, ...drugs, ...fps, ...ngs].forEach(i => days.add(dayOf(i.created_at)));
-  return Array.from(days).sort().map(d => {
-    const dfp = fps.filter(f => dayOf(f.created_at) === d);
-    const dng = ngs.filter(n => dayOf(n.created_at) === d);
-    return {
-      date: d, label: fmtDay(d),
-      mrt: dfp.length ? Math.round(avg(dfp.map(f => f.mrt))) : null,
-      motrice: dng.length ? Math.round(avg(dng.map(n => n.motrice_planification))) : null,
-      inhibition: dfp.length ? Math.round(avg(dfp.map(f => f.inhibition_rate)) * 100) / 100 : null,
-      drugCount: drugs.filter(dr => dayOf(dr.created_at) === d).length,
-      criseCount: crises.filter(c => dayOf(c.created_at) === d).length,
-    };
-  });
+  // Un point par session de jeu individuelle
+  const points: TimelinePoint[] = [];
+
+  for (const fp of fps) {
+    const t = toDate(fp.created_at).getTime();
+    points.push({
+      ts: t,
+      label: fmtTime(toDate(fp.created_at)),
+      mrt: Math.round(fp.mrt),
+      motrice: null,
+      inhibition: Math.round(fp.inhibition_rate * 100) / 100,
+      drugCount: drugs.filter(d => Math.abs(toDate(d.created_at).getTime() - t) <= PROXIMITY_MS).length,
+      criseCount: crises.filter(c => Math.abs(toDate(c.created_at).getTime() - t) <= PROXIMITY_MS).length,
+    });
+  }
+
+  for (const ng of ngs) {
+    const t = toDate(ng.created_at).getTime();
+    points.push({
+      ts: t,
+      label: fmtTime(toDate(ng.created_at)),
+      mrt: null,
+      motrice: Math.round(ng.motrice_planification),
+      inhibition: null,
+      drugCount: drugs.filter(d => Math.abs(toDate(d.created_at).getTime() - t) <= PROXIMITY_MS).length,
+      criseCount: crises.filter(c => Math.abs(toDate(c.created_at).getTime() - t) <= PROXIMITY_MS).length,
+    });
+  }
+
+  // Tri chronologique
+  points.sort((a, b) => a.ts - b.ts);
+  return points;
 }
 
 function getLastDrug(drugs: Drug[]): string {
