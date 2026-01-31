@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import { api } from '../services/api';
 import './FruitNinjaPage.css';
 
 interface Bubble {
@@ -20,13 +21,18 @@ const FruitNinjaPage: React.FC = () => {
   const [score, setScore] = useState(0);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [errorEffect, setErrorEffect] = useState(false);
-  const [gameTime, setGameTime] = useState(20); // Capé à 20 secondes
+  const [gameTime, setGameTime] = useState(20); 
   const [highScore, setHighScore] = useState(0);
   
+  // Statistiques pour l'API
+  const reactionTimesRef = useRef<number[]>([]);
+  const hitsRef = useRef(0);
+  const missesRef = useRef(0);
+  const jellyfishHitsRef = useRef(0);
+
   const nextIdRef = useRef(0);
   const gameAreaRef = useRef<HTMLDivElement>(null);
   
-  // Audio refs
   const popSoundRef = useRef<HTMLAudioElement | null>(null);
   const errorSoundRef = useRef<HTMLAudioElement | null>(null);
 
@@ -48,16 +54,13 @@ const FruitNinjaPage: React.FC = () => {
     if (gameState !== 'playing') return;
 
     const timer = setInterval(() => {
-      // 1. Calcul du temps de session restant
       const sessionElapsed = (Date.now() - (sessionStartTime || Date.now())) / 1000;
       const sessionRemaining = Math.max(0, Math.ceil(sessionDuration - sessionElapsed));
 
       setGameTime((prev) => {
         const nextTime = prev - 1;
-        
-        // On s'arrête si le temps de la partie (20s) OU de la session est fini
         if (nextTime <= 0 || sessionRemaining <= 0) {
-          setGameState('gameOver');
+          finishGame();
           return 0;
         }
         return nextTime;
@@ -80,7 +83,7 @@ const FruitNinjaPage: React.FC = () => {
         isPopping: false,
       };
       setBubbles((prev) => [...prev, newBubble]);
-    }, 800); // Un peu plus rapide pour plus de fun
+    }, 800);
     return () => clearInterval(spawnInterval);
   }, [gameState]);
 
@@ -88,8 +91,16 @@ const FruitNinjaPage: React.FC = () => {
     if (gameState !== 'playing') return;
     const cleanupInterval = setInterval(() => {
       const now = Date.now();
-      // On fait disparaître les ballons/méduses après 4 secondes
-      setBubbles((prev) => prev.filter(b => (now - b.createdAt < 4000) || b.isPopping));
+      setBubbles((prev) => {
+        const filtered = prev.filter(b => {
+          const isExpired = now - b.createdAt >= 4000;
+          if (isExpired && b.type === 'fruit' && !b.isPopping) {
+            missesRef.current++; // On compte un raté si le ballon disparaît
+          }
+          return !isExpired || b.isPopping;
+        });
+        return filtered;
+      });
     }, 100);
     return () => clearInterval(cleanupInterval);
   }, [gameState]);
@@ -113,7 +124,10 @@ const FruitNinjaPage: React.FC = () => {
     e.stopPropagation();
     if (bubble.isPopping) return;
     
+    const reactionTime = Date.now() - bubble.createdAt;
+
     if (bubble.type === 'jellyfish') {
+      jellyfishHitsRef.current++;
       playErrorSound();
       setScore((prev) => Math.max(0, prev - 10));
       setErrorEffect(true);
@@ -123,6 +137,8 @@ const FruitNinjaPage: React.FC = () => {
         setBubbles((prev) => prev.filter((b) => b.id !== bubble.id));
       }, 600);
     } else {
+      hitsRef.current++;
+      reactionTimesRef.current.push(reactionTime);
       playPopSound();
       setScore((prev) => prev + 5);
       setBubbles((prev) => prev.map(b => b.id === bubble.id ? { ...b, isPopping: true } : b));
@@ -134,19 +150,54 @@ const FruitNinjaPage: React.FC = () => {
 
   const startGame = () => {
     if (!isSessionActive) return;
+    // Reset stats
+    reactionTimesRef.current = [];
+    hitsRef.current = 0;
+    missesRef.current = 0;
+    jellyfishHitsRef.current = 0;
+    
     setGameState('playing');
     setScore(0);
     setBubbles([]);
-    setGameTime(20); // Reset à 20 secondes au début de chaque partie
+    setGameTime(20);
     setErrorEffect(false);
     nextIdRef.current = 0;
   };
 
-  const finishGame = () => {
+  const finishGame = async () => {
+    setGameState('gameOver');
+    
+    // Calcul des KPIs pour l'API
+    const mrt = reactionTimesRef.current.length > 0 
+      ? reactionTimesRef.current.reduce((a, b) => a + b, 0) / reactionTimesRef.current.length 
+      : 0;
+    
+    const totalFruitTargets = hitsRef.current + missesRef.current;
+    const inhibition_rate = totalFruitTargets > 0 ? hitsRef.current / totalFruitTargets : 0;
+    
+    // IIV (Intra-Individual Variability) : écart-type des temps de réaction
+    let iiv_score = 0;
+    if (reactionTimesRef.current.length > 1) {
+      const mean = mrt;
+      const squareDiffs = reactionTimesRef.current.map(t => Math.pow(t - mean, 2));
+      const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / squareDiffs.length;
+      iiv_score = Math.sqrt(avgSquareDiff);
+    }
+
+    try {
+      await api.createFlashPopResult(mrt, inhibition_rate, iiv_score);
+      console.log("Score FlashPop envoyé à l'API");
+    } catch (err) {
+      console.error("Erreur envoi score FlashPop:", err);
+    }
+
     if (score > highScore) {
       setHighScore(score);
       localStorage.setItem('fruitNinjaHighScore', score.toString());
     }
+  };
+
+  const backToMenu = () => {
     setGameState('menu');
   };
 
@@ -177,7 +228,7 @@ const FruitNinjaPage: React.FC = () => {
           <button className="btn-primary" onClick={startGame} disabled={!isSessionActive}>
             Rejouer
           </button>
-          <button className="btn-secondary" onClick={finishGame}>Retour</button>
+          <button className="btn-secondary" onClick={backToMenu}>Retour</button>
         </div>
       </div>
     );

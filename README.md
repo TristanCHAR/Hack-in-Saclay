@@ -24,7 +24,7 @@ npm install
 npm start
 ```
 
-L'application sera accessible sur `http://localhost:3000`
+L'application sera accessible sur `https://marmoset-legible-stingray.ngrok-free.app/`
 
 3. **Créer une version de production** :
 ```bash
@@ -42,13 +42,13 @@ Une **Progressive Web App** est une application web qui peut être installée et
 
 #### 1. Site Web (Landing Page) - Route `/`
 - C'est la **page d'accueil publique**
-- Visible quand on arrive sur `http://localhost:3000/`
+- Visible quand on arrive sur `https://marmoset-legible-stingray.ngrok-free.app//`
 - Contient le texte d'introduction et un bouton
 - Quand on clique sur le bouton → Redirection vers `/app`
 
 #### 2. Application PWA - Route `/app`
 - C'est la **partie application** avec la navbar en bas
-- Accessible via `http://localhost:3000/app`
+- Accessible via `https://marmoset-legible-stingray.ngrok-free.app//app`
 - Contient :
   - **Navbar en bas** avec 2 onglets (Admin / Jeux)
   - **Page Admin** (`/app/admin`) - Affiche "Admin" centré
@@ -63,7 +63,7 @@ Une **Progressive Web App** est une application web qui peut être installée et
 ```bash
 npm start
 ```
-1. Ouvrir `http://localhost:3000` → Tu vois la landing page
+1. Ouvrir `https://marmoset-legible-stingray.ngrok-free.app/` → Tu vois la landing page
 2. Cliquer sur "Accéder à l'application" → Tu passes à `/app` avec la navbar en bas
 3. Naviguer entre les onglets Admin et Jeux
 
@@ -73,7 +73,7 @@ npm start
 ```
 1. Ouvrir le simulateur iOS (Xcode)
 2. Ouvrir **Safari** dans le simulateur
-3. Aller sur `http://localhost:3000` (ou l'IP de ton Mac : `http://192.168.x.x:3000`)
+3. Aller sur `https://marmoset-legible-stingray.ngrok-free.app/` (ou l'IP de ton Mac : `http://192.168.x.x:3000`)
 4. Tu verras la landing page
 5. Clique sur le bouton → Tu arrives sur l'app avec la navbar
 

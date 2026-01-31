@@ -1,16 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { api } from '../services/api';
 
 export interface MedicationLog {
   id: string;
   name: string;
-  timestamp: number;
+  created_at: string;
 }
 
 export interface SeizureLog {
   id: string;
-  timestamp: number;
-  duration?: number; // en secondes
-  notes?: string;
+  duration: number;
+  created_at: string;
 }
 
 interface SettingsContextType {
@@ -21,9 +21,10 @@ interface SettingsContextType {
   resetSession: () => void;
   isSessionActive: boolean;
   medications: MedicationLog[];
-  addMedication: (name: string) => void;
+  addMedication: (name: string) => Promise<void>;
   seizures: SeizureLog[];
-  addSeizure: (notes?: string, duration?: number) => void;
+  addSeizure: (duration: number) => Promise<void>;
+  refreshData: () => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -39,27 +40,29 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return saved ? parseInt(saved, 10) : null;
   });
 
-  const [medications, setMedications] = useState<MedicationLog[]>(() => {
-    const saved = localStorage.getItem('medications');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [medications, setMedications] = useState<MedicationLog[]>([]);
+  const [seizures, setSeizures] = useState<SeizureLog[]>([]);
 
-  const [seizures, setSeizures] = useState<SeizureLog[]>(() => {
-    const saved = localStorage.getItem('seizures');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const refreshData = async () => {
+    try {
+      const [meds, seiz] = await Promise.all([
+        api.getDrugs(),
+        api.getCrises()
+      ]);
+      setMedications(meds);
+      setSeizures(seiz);
+    } catch (err) {
+      console.error("Erreur refresh API:", err);
+    }
+  };
+
+  useEffect(() => {
+    refreshData();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('sessionDuration', sessionDuration.toString());
   }, [sessionDuration]);
-
-  useEffect(() => {
-    localStorage.setItem('medications', JSON.stringify(medications));
-  }, [medications]);
-
-  useEffect(() => {
-    localStorage.setItem('seizures', JSON.stringify(seizures));
-  }, [seizures]);
 
   const startSession = () => {
     if (!sessionStartTime) {
@@ -74,23 +77,22 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     sessionStorage.removeItem('sessionStartTime');
   };
 
-  const addMedication = (name: string) => {
-    const newLog: MedicationLog = {
-      id: Date.now().toString(),
-      name,
-      timestamp: Date.now(),
-    };
-    setMedications(prev => [newLog, ...prev]);
+  const addMedication = async (name: string) => {
+    try {
+      await api.createDrug(name);
+      await refreshData();
+    } catch (err) {
+      console.error("Erreur add med API:", err);
+    }
   };
 
-  const addSeizure = (notes?: string, duration?: number) => {
-    const newLog: SeizureLog = {
-      id: Date.now().toString(),
-      timestamp: Date.now(),
-      notes,
-      duration,
-    };
-    setSeizures(prev => [newLog, ...prev]);
+  const addSeizure = async (duration: number) => {
+    try {
+      await api.createCrise(duration);
+      await refreshData();
+    } catch (err) {
+      console.error("Erreur add seizure API:", err);
+    }
   };
 
   const isSessionActive = useMemo(() => {
@@ -100,17 +102,18 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [sessionStartTime, sessionDuration]);
 
   return (
-    <SettingsContext.Provider value={{
-      sessionDuration,
-      setSessionDuration,
-      sessionStartTime,
+    <SettingsContext.Provider value={{ 
+      sessionDuration, 
+      setSessionDuration, 
+      sessionStartTime, 
       startSession,
       resetSession,
       isSessionActive,
       medications,
       addMedication,
       seizures,
-      addSeizure
+      addSeizure,
+      refreshData
     }}>
       {children}
     </SettingsContext.Provider>
