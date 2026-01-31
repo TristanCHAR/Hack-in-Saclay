@@ -176,12 +176,8 @@ const FruitNinjaPage: React.FC = () => {
     hitsRef.current = 0;
     missesRef.current = 0;
     jellyfishHitsRef.current = 0;
-<<<<<<< HEAD
-
-=======
     jellyfishTotalRef.current = 0;
     
->>>>>>> 00dadde (refactor(BrainScene): simplify color logic and update camera position)
     setGameState('playing');
     setScore(0);
     setBubbles([]);
