@@ -35,9 +35,9 @@ const FruitNinjaPage: React.FC = () => {
         const saved = localStorage.getItem('fruitNinjaHighScore');
         if (saved) setHighScore(parseInt(saved, 10));
 
-        // Initialisation des sons
-        popSoundRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3'); // Son de pop (éclatement)
-        errorSoundRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3'); // Son d'erreur (buzzer)
+        // Initialisation des sons locaux
+        popSoundRef.current = new Audio(process.env.PUBLIC_URL + '/assets/sounds/pop_ballon.wav');
+        errorSoundRef.current = new Audio(process.env.PUBLIC_URL + '/assets/sounds/medusa.mp3');
 
         // Préchargement
         popSoundRef.current.load();
