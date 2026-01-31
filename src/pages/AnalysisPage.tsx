@@ -9,6 +9,8 @@ import {
   RefreshCw, BarChart3
 } from 'lucide-react';
 import { api } from '../services/api';
+import { useWorkspaceStore } from '../stores/workspaceStore';
+import { useChildAuthStore } from '../stores/childAuthStore';
 import './AnalysisPage.css';
 
 const BrainScene = React.lazy(() => import('../components/BrainScene'));
@@ -19,7 +21,7 @@ const BrainScene = React.lazy(() => import('../components/BrainScene'));
 interface Crise { id: number; duration: number; created_at: string }
 interface Drug { id: number; name: string; created_at: string }
 interface FlashPop { id: number; mrt: number; inhibition_rate: number; iiv_score: number; created_at: string }
-interface NoiseGame { id: number; vocal_initention_latence: number; motrice_planification: number; created_at: string }
+interface NoiseGame { id: number; vocal_intention_latence: number; motrice_planification: number; created_at: string }
 
 interface TimelinePoint {
   label: string;
@@ -284,19 +286,81 @@ const AnalysisPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [childName, setChildName] = useState<string>('');
+  const { activeWorkspace } = useWorkspaceStore();
 
   const fetchData = async () => {
     try {
-      const [c, d, fp, ng] = await Promise.all([
-        api.getCrises(), api.getDrugs(),
-        api.getFlashPopHistory(), api.getNoiseGameHistory(),
+      let currentChildId = null;
+      let currentChildName = '';
+
+      if (activeWorkspace) {
+        // Mode Parent : on cherche l'enfant du workspace
+        const { supabase } = await import('../lib/supabase');
+        const { data: children, error: childError } = await supabase
+          .from('children')
+          .select('id, name')
+          .eq('workspace_id', activeWorkspace.id)
+          .limit(1);
+
+        if (childError) throw childError;
+
+        if (children && children.length > 0) {
+          currentChildId = children[0].id;
+          currentChildName = children[0].name;
+        }
+      } else {
+        // Tentative de fallback sur l'auth enfant directe
+        const childAuthStr = localStorage.getItem('childAuth');
+        if (childAuthStr) {
+          const auth = JSON.parse(childAuthStr);
+          currentChildId = auth.id;
+          currentChildName = auth.name;
+        }
+      }
+
+      if (!currentChildId) {
+        setError('Aucun enfant ou workspace sélectionné');
+        setLoading(false);
+        return;
+      }
+
+      setChildName(currentChildName);
+      console.log("[Analysis] Fetching data for child:", currentChildId, currentChildName);
+
+      // Récupérer les données depuis Supabase
+      const [c, d, fpRaw, ngRaw] = await Promise.all([
+        api.getCrises(),
+        api.getDrugs(),
+        api.getFlashPopHistory(),
+        api.getNoiseGameHistory(),
       ]);
+
+      console.log("[Analysis] Data fetched:", { crises: c, drugs: d, flashPop: fpRaw, noiseGame: ngRaw });
+
+      // Transformer les données au format attendu par AnalysisPage
+      const fp = (fpRaw || []).map((session: any) => ({
+        id: session.id,
+        mrt: session.metrics?.mrt || 0,
+        inhibition_rate: session.metrics?.inhibition_rate || 0,
+        iiv_score: session.metrics?.iiv_score || 0,
+        created_at: session.started_at,
+      }));
+
+      const ng = (ngRaw || []).map((session: any) => ({
+        id: session.id,
+        vocal_intention_latence: session.metrics?.vocal_intention_latence || 0,
+        motrice_planification: session.metrics?.motrice_planification || 0,
+        created_at: session.started_at,
+      }));
+
       setCrises(Array.isArray(c) ? c : []);
       setDrugs(Array.isArray(d) ? d : []);
-      setFlashPops(Array.isArray(fp) ? fp : []);
-      setNoiseGames(Array.isArray(ng) ? ng : []);
+      setFlashPops(fp);
+      setNoiseGames(ng);
       setError(null);
     } catch (e: any) {
+      console.error("[Analysis] Fetch error:", e);
       setError(e.message);
     }
   };
@@ -320,9 +384,9 @@ const AnalysisPage: React.FC = () => {
   const stability = useMemo(() => stabilityScore(flashPops, noiseGames), [flashPops, noiseGames]);
   const timeline = useMemo(() => buildTimeline(crises, drugs, flashPops, noiseGames), [crises, drugs, flashPops, noiseGames]);
   const baselineMrt = useMemo(() => flashPops.length ? Math.round(avg(flashPops.map(f => f.mrt))) : null, [flashPops]);
-  const baselineVocal = useMemo(() => noiseGames.length ? Math.round(avg(noiseGames.map(n => n.vocal_initention_latence))) : null, [noiseGames]);
-  const avgVocal = useMemo(() => noiseGames.length ? avg(noiseGames.map(n => n.vocal_initention_latence)) : 0, [noiseGames]);
-  const maxVocal = useMemo(() => noiseGames.length ? Math.max(...noiseGames.map(n => n.vocal_initention_latence), 500) : 500, [noiseGames]);
+  const baselineVocal = useMemo(() => noiseGames.length ? Math.round(avg(noiseGames.map(n => n.vocal_intention_latence))) : null, [noiseGames]);
+  const avgVocal = useMemo(() => noiseGames.length ? avg(noiseGames.map(n => n.vocal_intention_latence)) : 0, [noiseGames]);
+  const maxVocal = useMemo(() => noiseGames.length ? Math.max(...noiseGames.map(n => n.vocal_intention_latence), 500) : 500, [noiseGames]);
   const lastDrug = useMemo(() => getLastDrug(drugs), [drugs]);
   const totalSessions = flashPops.length + noiseGames.length;
 
@@ -369,6 +433,13 @@ const AnalysisPage: React.FC = () => {
           <Brain size={48} /><h3>Aucune donnée disponible</h3>
           <p>Jouez à Flash Pop ou au Jeu du Bruit pour commencer à collecter des métriques.</p>
         </div>
+        <button
+          onClick={() => fetchData()}
+          className="refresh-btn"
+          title="Rafraîchir les données"
+        >
+          <RefreshCw className={refreshing ? 'spinning' : ''} size={20} />
+        </button>
       </div>
     );
   }
@@ -378,7 +449,7 @@ const AnalysisPage: React.FC = () => {
       {/* ═══ HEADER ═══ */}
       <div className="metrics-header-row">
         <div>
-          <h1 className="metrics-title">NeuroPerformance</h1>
+          <h1 className="metrics-title">NeuroPerformance{childName ? ` — ${childName}` : ''}</h1>
           <p className="metrics-subtitle">{stats.totalDataPoints} données — Dernier traitement : {lastDrug}</p>
         </div>
         <button className={`btn-refresh ${refreshing ? 'spinning' : ''}`} onClick={handleRefresh}>
@@ -540,7 +611,7 @@ const AnalysisPage: React.FC = () => {
                 : `Augmentation de ${impact.toFixed(1)}% des crises. Un suivi rapproché est recommandé.`}
             {stats.correlation !== 0 && (
               <> Corrélation Drug/MRT : <strong>r = {stats.correlation.toFixed(3)}</strong>
-              {Math.abs(stats.correlation) > 0.5 ? ' (significative)' : ' (faible)'}.</>
+                {Math.abs(stats.correlation) > 0.5 ? ' (significative)' : ' (faible)'}.</>
             )}
           </p>
         </div>
@@ -553,7 +624,7 @@ const AnalysisPage: React.FC = () => {
           <p className="card-desc">Temps moyen entre l'approche d'un obstacle et le cri du joueur dans le Jeu du Bruit. Une valeur haute indique un temps de réaction vocal lent (fatigue ou difficulté de planification).</p>
           {noiseGames.length > 0 ? (
             <><VocalGauge value={avgVocal} maxVal={maxVocal} />
-            {baselineVocal != null && <p className="baseline-note">Baseline : <strong>{baselineVocal} ms</strong></p>}</>
+              {baselineVocal != null && <p className="baseline-note">Baseline : <strong>{baselineVocal} ms</strong></p>}</>
           ) : <p className="no-data-msg">Jouez au Jeu du Bruit pour collecter des données vocales.</p>}
         </section>
 

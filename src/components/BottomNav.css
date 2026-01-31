@@ -38,9 +38,14 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
+.nav-icon {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
 .nav-text {
-    font-size: 14px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 600;
     letter-spacing: -0.01em;
 }
 

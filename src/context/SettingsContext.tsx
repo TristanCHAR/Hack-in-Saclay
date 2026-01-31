@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
+import { useChildAuthStore } from '../stores/childAuthStore';
 
 export interface MedicationLog {
   id: string;
@@ -36,12 +37,31 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
 
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(() => {
-    const saved = sessionStorage.getItem('sessionStartTime');
+    const saved = localStorage.getItem('sessionStartTime');
     return saved ? parseInt(saved, 10) : null;
   });
 
   const [medications, setMedications] = useState<MedicationLog[]>([]);
   const [seizures, setSeizures] = useState<SeizureLog[]>([]);
+
+  const { child } = useChildAuthStore();
+
+  const [isSessionActive, setIsSessionActive] = useState(true);
+
+  const startSession = useCallback(() => {
+    const now = Date.now();
+    console.log("[Settings] >>> STARTING PERSISTENT SESSION AT:", new Date(now).toLocaleTimeString());
+    setSessionStartTime(now);
+    localStorage.setItem('sessionStartTime', now.toString());
+    setIsSessionActive(true);
+  }, []);
+
+  const resetSession = useCallback(() => {
+    console.log("[Settings] >>> RESETTING PERSISTENT SESSION");
+    setSessionStartTime(null);
+    localStorage.removeItem('sessionStartTime');
+    setIsSessionActive(true);
+  }, []);
 
   const refreshData = async () => {
     try {
@@ -56,26 +76,51 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
+  // Charger session_duration et check reset depuis la DB
   useEffect(() => {
+    const loadChildSettings = async () => {
+      if (!child?.id) return;
+
+      try {
+        const { supabase } = await import('../lib/supabase');
+        const { data, error } = await supabase
+          .from('children')
+          .select('session_duration, last_session_reset')
+          .eq('id', child.id)
+          .single();
+
+        if (error) throw error;
+
+        // 1. Durée
+        const durationMin = data?.session_duration || 15;
+        setSessionDuration(durationMin * 60);
+
+        // 2. Reset distant
+        if (data?.last_session_reset && sessionStartTime) {
+          const remoteReset = new Date(data.last_session_reset).getTime();
+          if (remoteReset > sessionStartTime) {
+            console.log("[Settings] Parent reset detected! Clearing local session.");
+            resetSession();
+          }
+        }
+      } catch (err) {
+        console.error("[Settings] Erreur loadChildSettings:", err);
+      }
+    };
+
+    loadChildSettings();
     refreshData();
-  }, []);
+
+    // Polling léger pour le reset (toutes les 10s)
+    const id = setInterval(loadChildSettings, 10000);
+    return () => clearInterval(id);
+  }, [child?.id, sessionStartTime, resetSession]);
 
   useEffect(() => {
-    localStorage.setItem('sessionDuration', sessionDuration.toString());
-  }, [sessionDuration]);
-
-  const startSession = () => {
-    if (!sessionStartTime) {
-      const now = Date.now();
-      setSessionStartTime(now);
-      sessionStorage.setItem('sessionStartTime', now.toString());
+    if (sessionDuration > 0) {
+      localStorage.setItem('sessionDuration', sessionDuration.toString());
     }
-  };
-
-  const resetSession = () => {
-    setSessionStartTime(null);
-    sessionStorage.removeItem('sessionStartTime');
-  };
+  }, [sessionDuration]);
 
   const addMedication = async (name: string) => {
     try {
@@ -95,29 +140,42 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const computeActive = useCallback(() => {
-    if (!sessionStartTime) return true;
-    const elapsed = (Date.now() - sessionStartTime) / 1000;
-    return elapsed < sessionDuration;
-  }, [sessionStartTime, sessionDuration]);
-
-  const [isSessionActive, setIsSessionActive] = useState(computeActive);
-
-  // Re-évalue chaque seconde tant qu'une session tourne
+  // Sync isSessionActive with timer
   useEffect(() => {
-    setIsSessionActive(computeActive());
-    if (!sessionStartTime) return;
     const id = setInterval(() => {
-      setIsSessionActive(computeActive());
+      if (!sessionStartTime) {
+        setIsSessionActive(true);
+        return;
+      }
+
+      const elapsed = (Date.now() - sessionStartTime) / 1000;
+      const remaining = sessionDuration - elapsed;
+
+      if (remaining <= 0) {
+        if (isSessionActive) {
+          console.log("[Settings] !!! SESSION EXPIRED !!!");
+          setIsSessionActive(false);
+        }
+      } else {
+        if (!isSessionActive) setIsSessionActive(true);
+      }
     }, 1000);
+
     return () => clearInterval(id);
-  }, [computeActive, sessionStartTime]);
+  }, [sessionStartTime, sessionDuration, isSessionActive]);
+
+  // Si on se déconnecte, on reset la session
+  useEffect(() => {
+    if (!child) {
+      resetSession();
+    }
+  }, [child, resetSession]);
 
   return (
-    <SettingsContext.Provider value={{ 
-      sessionDuration, 
-      setSessionDuration, 
-      sessionStartTime, 
+    <SettingsContext.Provider value={{
+      sessionDuration,
+      setSessionDuration,
+      sessionStartTime,
       startSession,
       resetSession,
       isSessionActive,

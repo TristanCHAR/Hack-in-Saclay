@@ -3,16 +3,16 @@ import { useSettings } from '../context/SettingsContext';
 import './AdminPage.css';
 
 const AdminPage: React.FC = () => {
-  const { 
-    sessionDuration, 
-    setSessionDuration, 
-    resetSession, 
-    medications, 
-    addMedication, 
-    seizures, 
-    addSeizure 
+  const {
+    sessionDuration,
+    setSessionDuration,
+    resetSession,
+    medications,
+    addMedication,
+    seizures,
+    addSeizure
   } = useSettings();
-  
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [medName, setMedName] = useState('');
   const [showMedForm, setShowMedName] = useState(false);
@@ -20,6 +20,8 @@ const AdminPage: React.FC = () => {
   // Seizure Timer State
   const [isSeizureTimerActive, setIsSeizureTimerActive] = useState(false);
   const [seizureTime, setSeizureTime] = useState(0);
+  const [manualSeizureDuration, setManualSeizureDuration] = useState('');
+  const [showManualSeizureForm, setShowManualSeizureForm] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -68,6 +70,17 @@ const AdminPage: React.FC = () => {
     } else {
       // Start
       setIsSeizureTimerActive(true);
+      setShowManualSeizureForm(false);
+    }
+  };
+
+  const handleManualSeizureSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const duration = parseInt(manualSeizureDuration, 10);
+    if (!isNaN(duration) && duration > 0) {
+      await addSeizure(duration);
+      setManualSeizureDuration('');
+      setShowManualSeizureForm(false);
     }
   };
 
@@ -89,7 +102,7 @@ const AdminPage: React.FC = () => {
   return (
     <div className="admin-container">
       <div className="admin-header-actions">
-        <button 
+        <button
           className={`settings-icon-btn ${isSettingsOpen ? 'active' : ''}`}
           onClick={() => setIsSettingsOpen(!isSettingsOpen)}
           aria-label="Paramètres"
@@ -114,15 +127,47 @@ const AdminPage: React.FC = () => {
                   <p className="timer-hint">Chronométrage en cours...</p>
                 </div>
               )}
-              
-              <button 
-                onClick={toggleSeizureTimer} 
+
+              <button
+                onClick={toggleSeizureTimer}
                 className={`btn-main-action ${isSeizureTimerActive ? 'btn-stop' : 'btn-danger-large'}`}
               >
                 {isSeizureTimerActive ? 'Arrêter et Enregistrer' : 'Démarrer le chrono crise'}
               </button>
+
+              {!isSeizureTimerActive && !showManualSeizureForm && (
+                <button
+                  className="btn-manual-toggle"
+                  onClick={() => setShowManualSeizureForm(true)}
+                >
+                  ✎ Saisie manuelle
+                </button>
+              )}
+
+              {showManualSeizureForm && (
+                <form onSubmit={handleManualSeizureSubmit} className="manual-entry-form">
+                  <div className="manual-input-group">
+                    <input
+                      type="number"
+                      value={manualSeizureDuration}
+                      onChange={(e) => setManualSeizureDuration(e.target.value)}
+                      placeholder="Durée (sec)"
+                      className="manual-log-input"
+                      autoFocus
+                    />
+                    <button type="submit" className="btn-manual-confirm">OK</button>
+                    <button
+                      type="button"
+                      className="btn-manual-cancel"
+                      onClick={() => setShowManualSeizureForm(false)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
-            
+
             <div className="compact-log-list">
               <h3 className="list-title">Dernières crises</h3>
               {seizures.length === 0 ? (
@@ -154,8 +199,8 @@ const AdminPage: React.FC = () => {
 
             {showMedForm && (
               <form onSubmit={handleAddMed} className="log-form-inline">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={medName}
                   onChange={(e) => setMedName(e.target.value)}
                   placeholder="Nom..."
@@ -209,8 +254,8 @@ const AdminPage: React.FC = () => {
             <p className="settings-info-text">
               Enregistrer réinitialisera le temps de jeu pour l'enfant.
             </p>
-            <button 
-              className="btn-close-settings" 
+            <button
+              className="btn-close-settings"
               onClick={handleSave}
             >
               Enregistrer & Relancer

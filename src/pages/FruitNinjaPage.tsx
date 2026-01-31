@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { api } from '../services/api';
+import { useChildRoute } from '../hooks/useRouteProtection';
 import './FruitNinjaPage.css';
 
 interface Bubble {
@@ -17,6 +18,7 @@ interface Bubble {
 type GameState = 'menu' | 'playing' | 'gameOver';
 
 const FruitNinjaPage: React.FC = () => {
+  useChildRoute(); // Protéger contre accès parent
   const navigate = useNavigate();
   const { sessionDuration, isSessionActive, sessionStartTime } = useSettings();
   const [gameState, setGameState] = useState<GameState>('menu');
@@ -168,6 +170,15 @@ const FruitNinjaPage: React.FC = () => {
     }
   };
 
+  // Real-time session monitoring
+  useEffect(() => {
+    if (gameState === 'playing' && !isSessionActive) {
+      console.log("[FruitNinja] Session expired during gameplay!");
+      setGameState('menu');
+      alert("La session est terminée ! Ton temps de jeu est épuisé.");
+    }
+  }, [isSessionActive, gameState]);
+
   const startGame = () => {
     if (!isSessionActive) return;
     // Reset stats
@@ -177,7 +188,7 @@ const FruitNinjaPage: React.FC = () => {
     missesRef.current = 0;
     jellyfishHitsRef.current = 0;
     jellyfishTotalRef.current = 0;
-    
+
     setGameState('playing');
     setScore(0);
     setBubbles([]);
@@ -197,13 +208,13 @@ const FruitNinjaPage: React.FC = () => {
       : 0;
 
     const totalFruitTargets = hitsRef.current + missesRef.current;
-    
+
     // Inhibition = capacité à ne PAS cliquer sur les méduses
     // 1.0 = parfait (aucune méduse cliquée), 0.0 = toutes les méduses cliquées
     const inhibition_rate = jellyfishTotalRef.current > 0
       ? 1 - (jellyfishHitsRef.current / jellyfishTotalRef.current)
       : 1;
-    
+
     // IIV (Intra-Individual Variability) : écart-type des temps de réaction
     let iiv_score = 0;
     if (reactionTimesRef.current.length > 1) {
@@ -216,7 +227,7 @@ const FruitNinjaPage: React.FC = () => {
     try {
       await api.createFlashPopResult(mrt, inhibition_rate, iiv_score);
       console.log("Score FlashPop envoyé à l'API");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erreur envoi score FlashPop:", err);
     }
 
@@ -246,6 +257,18 @@ const FruitNinjaPage: React.FC = () => {
           <button className="btn-primary" onClick={startGame} disabled={!isSessionActive}>
             {isSessionActive ? 'Commencer' : 'Session expirée'}
           </button>
+          {!isSessionActive && (
+            <p className="session-expired-hint" style={{ marginTop: '10px', fontSize: '0.9rem', color: '#ff6b6b' }}>
+              Votre temps de jeu est épuisé pour cette session.
+            </p>
+          )}
+
+          {/* Debug Info (visible pour Mahir) */}
+          <div style={{ marginTop: '30px', fontSize: '10px', opacity: 0.3, color: '#666' }}>
+            <p>Durée configurée : {sessionDuration}s</p>
+            <p>Session active : {isSessionActive ? 'OUI' : 'NON'}</p>
+            <p>Start Time : {sessionStartTime ? new Date(sessionStartTime).toLocaleTimeString() : 'NUL'}</p>
+          </div>
         </div>
       </div>
     );
