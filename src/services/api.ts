@@ -247,4 +247,143 @@ export const api = {
     }
     return data;
   },
+
+  // ============================================
+  // EVALUATION & ONBOARDING
+  // ============================================
+
+  completeEvaluation: async () => {
+    const childId = await getCurrentChildId();
+    if (!childId) throw new Error('No child ID found');
+
+    console.log("[API] Completing evaluation for child:", childId);
+
+    // 1. Récupérer les derniers scores pour l'algo de recommandation
+    const [flashPopHistory, noiseHistory] = await Promise.all([
+      api.getFlashPopHistory(),
+      api.getNoiseGameHistory()
+    ]);
+
+    const lastFlashPop = flashPopHistory[0] || {};
+    const lastNoise = noiseHistory[0] || {};
+
+    const inhibitionScore = lastFlashPop.score || 0;
+    const noiseScore = 50; // Score arbitraire pour l'instant car NoiseGame n'a pas de score normalisé 0-100 facile
+
+    let recommendationTitle = "";
+    let recommendationMsg = "";
+
+    // Logique de recommandation basique (à affiner)
+    if (inhibitionScore < 50) {
+      recommendationTitle = "Renforcement Inhibition requis";
+      recommendationMsg = "L'évaluation indique des difficultés d'inhibition. Nous recommandons des sessions régulières de Flash Pop.";
+    } else {
+      recommendationTitle = "Bonne Inhibition";
+      recommendationMsg = "Excellents résultats en inhibition ! Vous pouvez explorer d'autres jeux pour diversifier.";
+    }
+
+    // 2. Marquer l'enfant comme onboarded
+    const { error: updateError } = await supabase
+      .from('children')
+      .update({ is_onboarded: true })
+      .eq('id', childId);
+
+    if (updateError) {
+      console.error("[API] Failed to update onboarding status:", updateError);
+      throw updateError;
+    }
+
+    // 3. Créer une notification pour le parent
+    // On doit récupérer le workspace_id de l'enfant pour la notif
+    const { data: childData } = await supabase
+      .from('children')
+      .select('workspace_id, name')
+      .eq('id', childId)
+      .single();
+
+    if (childData) {
+      // Message générique basé sur les scores uniquement
+      const neutralTitle = `Rapport d'évaluation : ${childData.name}`;
+      const neutralMsg = `L'évaluation est terminée. Score Inhibition : ${inhibitionScore}/100. Score Bruit : ${noiseScore}.`;
+
+      const { error: notifError } = await supabase.from('notifications').insert({
+        workspace_id: childData.workspace_id,
+        child_id: childId,
+        type: 'evaluation_report',
+        title: neutralTitle,
+        message: neutralMsg,
+        data: {
+          inhibitionScore,
+          noiseScore,
+          recommendation: "Voir le détail complet dans l'onglet Analyse."
+        }
+      });
+
+      if (notifError) {
+        console.error("[API] Failed to create notification:", notifError);
+      } else {
+        console.log("[API] Notification created successfully for workspace:", childData.workspace_id);
+      }
+    }
+
+    console.log("[API] Evaluation completed successfully");
+    return true;
+  },
+
+  // ============================================
+  // NOTIFICATIONS (Parent Inbox)
+  // ============================================
+
+  getNotifications: async (workspaceId: string) => {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("[API] getNotifications error:", error);
+      return [];
+    }
+    return data || [];
+  },
+
+  markNotificationAsRead: async (notificationId: string) => {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId);
+
+    if (error) {
+      console.error("[API] markNotificationAsRead error:", error);
+      throw error;
+    }
+    if (error) {
+      console.error("[API] markNotificationAsRead error:", error);
+      throw error;
+    }
+    return true;
+  },
+
+  sendTestNotification: async (workspaceId: string) => {
+    console.log("[API] Sending test notification to workspace:", workspaceId);
+    const { data, error } = await supabase
+      .from('notifications')
+      .insert({
+        workspace_id: workspaceId,
+        type: 'session_alert', // Valid types: 'evaluation_report', 'session_alert', 'milestone'
+        title: 'Test Notification',
+        message: 'Ceci est une notification de test pour vérifier le système.',
+        data: { test: true },
+        is_read: false
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[API] Failed to send test notification:", error);
+      throw error;
+    }
+    return data;
+  }
 };

@@ -17,8 +17,16 @@ type GameState = 'menu' | 'playing' | 'gameOver';
 // Composant pour l'écran de fin
 const GameOverScreenWrapper: React.FC<{ score: number; navigate: any }> = ({ score, navigate }) => {
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const mode = searchParams.get('mode');
+
     const timer = setTimeout(() => {
-      navigate('/app/jeux');
+      if (mode === 'evaluation') {
+        // Redirection vers la fin de l'onboarding (Step 3: Bilan)
+        navigate('/child/onboarding?step=3');
+      } else {
+        navigate('/app/jeux');
+      }
     }, 3000);
     return () => clearTimeout(timer);
   }, [navigate]);
@@ -126,7 +134,10 @@ const JeuDuBruitPage: React.FC = () => {
 
   // Vérifier si la session expire pendant le jeu
   useEffect(() => {
-    if (gameState === 'playing' && !isSessionActive) {
+    const searchParams = new URLSearchParams(window.location.search);
+    const isEvaluation = searchParams.get('mode') === 'evaluation';
+
+    if (gameState === 'playing' && !isSessionActive && !isEvaluation) {
       console.log("[JeuDuBruit] Session expired during gameplay!");
       endGame();
       alert("La session est terminée ! Ton temps de jeu est épuisé.");
@@ -340,6 +351,11 @@ const JeuDuBruitPage: React.FC = () => {
 
   // endGame move up
 
+  // Mode évaluation : on ignore la limite de session
+  const searchParams = new URLSearchParams(window.location.search);
+  const isEvaluation = searchParams.get('mode') === 'evaluation';
+  const canPlay = isSessionActive || isEvaluation;
+
   return (
     <div className="noise-game-screen">
       <div className="game-header-minimal">
@@ -362,10 +378,10 @@ const JeuDuBruitPage: React.FC = () => {
             <h1 className="game-title-minimal">NoiseGame</h1>
             <p className="game-subtitle-minimal">Crie ou fais du bruit pour faire sauter ton personnage !</p>
             {highScore > 0 && <p className="high-score-minimal">Record : {highScore}</p>}
-            <button className="btn-primary" onClick={startGame} disabled={!isSessionActive}>
-              {isSessionActive ? 'Commencer' : 'Session expirée'}
+            <button className="btn-primary" onClick={startGame} disabled={!canPlay}>
+              {canPlay ? 'Commencer' : 'Session expirée'}
             </button>
-            {!isSessionActive && (
+            {!canPlay && (
               <p className="session-expired-hint" style={{ marginTop: '10px', fontSize: '0.9rem', color: '#ff6b6b' }}>
                 Votre temps de jeu est épuisé pour cette session.
               </p>

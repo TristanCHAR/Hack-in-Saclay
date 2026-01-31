@@ -9,6 +9,7 @@ export interface Child {
     name: string;
     birth_date: string | null;
     avatar_config: any;
+    is_onboarded?: boolean;
     created_at: string;
     updated_at: string;
 }

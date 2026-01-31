@@ -17,6 +17,9 @@ import JeuDuBruitPage from './pages/JeuDuBruitPage';
 import { useAuthStore } from './stores/authStore';
 import { useChildAuthStore } from './stores/childAuthStore';
 
+import OnboardingPage from './pages/child/OnboardingPage';
+import { NotificationsPage } from './pages/parent/NotificationsPage';
+
 const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
     const { user, loading } = useAuthStore();
 
@@ -63,6 +66,20 @@ const RequireChildAuth: React.FC<{ children: React.ReactElement }> = ({ children
     return children;
 };
 
+const RequireOnboarding: React.FC<{ children: React.ReactElement }> = ({ children }) => {
+    const { child, loading } = useChildAuthStore();
+
+    if (loading) return null;
+
+    // Si l'enfant n'est pas onboarded, on le force vers l'onboarding
+    // Sauf si on est déjà sur la page d'onboarding (géré par le routeur)
+    if (child && !child.is_onboarded) {
+        return <Navigate to="/child/onboarding" replace />;
+    }
+
+    return children;
+};
+
 const App: React.FC = () => {
     return (
         <AuthProvider>
@@ -90,6 +107,9 @@ const App: React.FC = () => {
                         <Route index element={<Navigate to="/app/dashboard" replace />} />
                         <Route path="dashboard" element={<AdminPage />} />
                         <Route path="children" element={<ChildrenManagement />} />
+                        <Route path="dashboard" element={<AdminPage />} />
+                        <Route path="children" element={<ChildrenManagement />} />
+                        <Route path="notifications" element={<NotificationsPage />} />
                         <Route path="games" element={<GameAccessManagement />} />
                         <Route path="admin" element={<AdminPage />} />
                         <Route path="jeux" element={<JeuxPage />} />
@@ -99,9 +119,17 @@ const App: React.FC = () => {
                     </Route>
 
                     {/* Child protected routes */}
+                    <Route path="/child/onboarding" element={
+                        <RequireChildAuth>
+                            <OnboardingPage />
+                        </RequireChildAuth>
+                    } />
+
                     <Route path="/child/jeux" element={
                         <RequireChildAuth>
-                            <ChildGamesPage />
+                            <RequireOnboarding>
+                                <ChildGamesPage />
+                            </RequireOnboarding>
                         </RequireChildAuth>
                     } />
                     <Route path="/child/jeux/fruit-ninja" element={

@@ -196,3 +196,47 @@
     max-width: 120px;
   }
 }
+
+/* Notification Button */
+.notification-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 2px solid #E0E0E0;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  position: relative;
+}
+
+.notification-btn:hover {
+  border-color: #FF6B6B;
+  background: #FFF5F5;
+  transform: translateY(-2px);
+}
+
+.bell-icon {
+  font-size: 20px;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #FF6B6B;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+}

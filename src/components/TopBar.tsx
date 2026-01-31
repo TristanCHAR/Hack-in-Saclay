@@ -129,6 +129,16 @@ export const TopBar: React.FC = () => {
                         )}
                     </div>
 
+                    {/* Notifications Bell */}
+                    <button
+                        className="notification-btn"
+                        onClick={() => navigate('/app/notifications')}
+                        title="Alertes"
+                    >
+                        <span className="bell-icon">🔔</span>
+                        {/* On pourrait ajouter un badge ici si on fetch le count */}
+                    </button>
+
                     {/* Sign out button */}
                     <button className="sign-out-btn" onClick={handleSignOut} title="Déconnexion">
                         🚪

@@ -69,12 +69,22 @@ const FruitNinjaPage: React.FC = () => {
     const timer = setInterval(() => {
       if (finishedRef.current) return;
 
+      const searchParams = new URLSearchParams(window.location.search);
+      const isEvaluation = searchParams.get('mode') === 'evaluation';
+
       const sessionElapsed = (Date.now() - (sessionStartTime || Date.now())) / 1000;
       const sessionRemaining = Math.max(0, Math.ceil(sessionDuration - sessionElapsed));
 
       setGameTime((prev) => {
         const nextTime = prev - 1;
-        if (nextTime <= 0 || sessionRemaining <= 0) {
+
+        // En mode évaluation, on ignore sessionRemaining, on se base juste sur le temps de jeu (20s par défaut ?)
+        // Ou alors on laisse le temps de jeu configuré descendre jusqu'à 0
+        const shouldEnd = isEvaluation
+          ? nextTime <= 0
+          : (nextTime <= 0 || sessionRemaining <= 0);
+
+        if (shouldEnd) {
           // Marquer comme terminé et changer l'état directement
           if (!finishedRef.current) {
             finishedRef.current = true;
@@ -172,7 +182,10 @@ const FruitNinjaPage: React.FC = () => {
 
   // Real-time session monitoring
   useEffect(() => {
-    if (gameState === 'playing' && !isSessionActive) {
+    const searchParams = new URLSearchParams(window.location.search);
+    const isEvaluation = searchParams.get('mode') === 'evaluation';
+
+    if (gameState === 'playing' && !isSessionActive && !isEvaluation) {
       console.log("[FruitNinja] Session expired during gameplay!");
       setGameState('menu');
       alert("La session est terminée ! Ton temps de jeu est épuisé.");
@@ -180,7 +193,10 @@ const FruitNinjaPage: React.FC = () => {
   }, [isSessionActive, gameState]);
 
   const startGame = () => {
-    if (!isSessionActive) return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const isEvaluation = searchParams.get('mode') === 'evaluation';
+
+    if (!isSessionActive && !isEvaluation) return;
     // Reset stats
     finishedRef.current = false;
     reactionTimesRef.current = [];
@@ -237,15 +253,29 @@ const FruitNinjaPage: React.FC = () => {
     }
   };
 
-  // Redirection automatique après 3 secondes quand gameOver et session expirée
+  // Redirection automatique après 3 secondes quand gameOver et session expirée OU mode évaluation
   useEffect(() => {
-    if (gameState === 'gameOver' && !isSessionActive) {
+    if (gameState === 'gameOver') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const mode = searchParams.get('mode');
+
+      const timeoutDuration = 3000;
       const timer = setTimeout(() => {
-        navigate('/app/jeux');
-      }, 3000);
+        if (mode === 'evaluation') {
+          // Redirection vers la suite de l'onboarding (Step 2: Noise Game)
+          navigate('/child/onboarding?step=2');
+        } else if (!isSessionActive) {
+          navigate('/app/jeux');
+        }
+      }, timeoutDuration);
       return () => clearTimeout(timer);
     }
   }, [gameState, isSessionActive, navigate]);
+
+  // Mode évaluation : on ignore la limite de session
+  const searchParams = new URLSearchParams(window.location.search);
+  const isEvaluation = searchParams.get('mode') === 'evaluation';
+  const canPlay = isSessionActive || isEvaluation;
 
   if (gameState === 'menu') {
     return (
@@ -254,10 +284,10 @@ const FruitNinjaPage: React.FC = () => {
           <h1 className="game-title-minimal">Flash Pop</h1>
           <p className="game-subtitle-minimal">Cliquez sur les ballons colorés. Évitez les méduses.</p>
           {highScore > 0 && <p className="high-score-minimal">Record : {highScore}</p>}
-          <button className="btn-primary" onClick={startGame} disabled={!isSessionActive}>
-            {isSessionActive ? 'Commencer' : 'Session expirée'}
+          <button className="btn-primary" onClick={startGame} disabled={!canPlay}>
+            {canPlay ? 'Commencer' : 'Session expirée'}
           </button>
-          {!isSessionActive && (
+          {!canPlay && (
             <p className="session-expired-hint" style={{ marginTop: '10px', fontSize: '0.9rem', color: '#ff6b6b' }}>
               Votre temps de jeu est épuisé pour cette session.
             </p>
