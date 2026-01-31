@@ -270,16 +270,31 @@ export const api = {
     const inhibitionScore = lastFlashPop.score || 0;
     const noiseScore = 50; // Score arbitraire pour l'instant car NoiseGame n'a pas de score normalisé 0-100 facile
 
+    // 3. Logique de recommandation "Smart" (Comparaison des scores)
+
+    // Normalisation des scores pour comparaison
+    // FlashPop est déjà sur 100
+    // NoiseGame (Jeu du Bruit) est basé distancié, on va dire que 500 points = 100% (arbitraire mais fonctionnel)
+    const noiseScoreNormalized = Math.min(100, Math.round((lastNoise.score || 0) / 5));
+
     let recommendationTitle = "";
     let recommendationMsg = "";
+    let recommendedGameId = "";
+    let recommendedGameName = "";
 
-    // Logique de recommandation basique (à affiner)
-    if (inhibitionScore < 50) {
+    // Comparaison : On focus le jeu le plus "éteint" (score le plus faible)
+    if (inhibitionScore <= noiseScoreNormalized) {
+      // Faiblesse Inhibition -> Focus Flash Pop
+      recommendedGameId = "flash-pop"; // Changed from fruit-ninja to flash-pop based on context
+      recommendedGameName = "Flash Pop";
       recommendationTitle = "Renforcement Inhibition requis";
-      recommendationMsg = "L'évaluation indique des difficultés d'inhibition. Nous recommandons des sessions régulières de Flash Pop.";
+      recommendationMsg = `Score Inhibition (${inhibitionScore}/100) inférieur au Score Vocal (~${noiseScoreNormalized}/100). Nous activons uniquement Flash Pop pour travailler cette faculté.`;
     } else {
-      recommendationTitle = "Bonne Inhibition";
-      recommendationMsg = "Excellents résultats en inhibition ! Vous pouvez explorer d'autres jeux pour diversifier.";
+      // Faiblesse Vocal/Planification -> Focus Jeu du Bruit
+      recommendationTitle = "Planification Motrice à renforcer";
+      recommendationMsg = `Score Vocal (~${noiseScoreNormalized}/100) inférieur au Score Inhibition (${inhibitionScore}/100). Nous activons uniquement Jeu du Bruit pour travailler la planification motrice.`;
+      recommendedGameId = "noise-game"; // Changed from jeu-du-bruit to noise-game based on context
+      recommendedGameName = "Jeu du Bruit";
     }
 
     // 2. Marquer l'enfant comme onboarded
@@ -293,8 +308,7 @@ export const api = {
       throw updateError;
     }
 
-    // 3. Créer une notification pour le parent
-    // On doit récupérer le workspace_id de l'enfant pour la notif
+    // 4. Notification Parent
     const { data: childData } = await supabase
       .from('children')
       .select('workspace_id, name')
@@ -302,29 +316,41 @@ export const api = {
       .single();
 
     if (childData) {
-      // Message générique basé sur les scores uniquement
-      const neutralTitle = `Rapport d'évaluation : ${childData.name}`;
-      const neutralMsg = `L'évaluation est terminée. Score Inhibition : ${inhibitionScore}/100. Score Bruit : ${noiseScore}.`;
-
-      const { error: notifError } = await supabase.from('notifications').insert({
+      await supabase.from('notifications').insert({
         workspace_id: childData.workspace_id,
         child_id: childId,
         type: 'evaluation_report',
-        title: neutralTitle,
-        message: neutralMsg,
+        title: recommendationTitle,
+        message: recommendationMsg,
         data: {
           inhibitionScore,
-          noiseScore,
-          recommendation: "Voir le détail complet dans l'onglet Analyse."
+          noiseScore: lastNoise.score || 0,
+          recommendation: `Jeu recommandé et activé : ${recommendedGameName}`
         }
       });
-
-      if (notifError) {
-        console.error("[API] Failed to create notification:", notifError);
-      } else {
-        console.log("[API] Notification created successfully for workspace:", childData.workspace_id);
-      }
+      console.log("[API] Smart Notification sent");
     }
+
+    // 5. AUTO-CONFIGURATION : Activer uniquement le jeu recommandé
+    // On désactive tous les jeux connus, puis on active celui recommandé
+    const allGames = ['flash-pop', 'noise-game']; // Liste hardcodée pour l'instant (changed from fruit-ninja, jeu-du-bruit)
+
+    for (const gameId of allGames) {
+      const isEnabled = (gameId === recommendedGameId);
+
+      const { error: accessError } = await supabase
+        .from('child_game_access')
+        .upsert({
+          child_id: childId,
+          game_id: gameId,
+          enabled: isEnabled
+        }, {
+          onConflict: 'child_id,game_id'
+        });
+
+      if (accessError) console.error(`[API] Failed to set access for ${gameId}:`, accessError);
+    }
+    console.log(`[API] Game Access updated: Only ${recommendedGameName} enabled.`);
 
     console.log("[API] Evaluation completed successfully");
     return true;
