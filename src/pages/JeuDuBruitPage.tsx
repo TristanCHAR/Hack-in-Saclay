@@ -6,6 +6,7 @@ interface Platform {
   id: number;
   x: number;
   width: number;
+  y: number; // Ajout de la hauteur variable
 }
 
 type GameState = 'menu' | 'playing' | 'gameOver';
@@ -40,9 +41,9 @@ const JeuDuBruitPage: React.FC = () => {
   const JUMP_FORCE = -18;
   const MAX_HEIGHT = -250; // Limite de hauteur
   const GRAVITY = 0.9;
-  const FLOAT_GRAVITY = 0.05; // Gravité TRÈS faible pour une descente très lente
+  const FLOAT_GRAVITY = 0.03; // Gravité TRÈS faible pour une descente très lente
   const SPEED = 6;
-  const VOLUME_THRESHOLD = 15; // Seuil légèrement baissé pour faciliter le maintien du flottement
+  const VOLUME_THRESHOLD = 10; // Seuil légèrement baissé pour faciliter le maintien du flottement
 
   useEffect(() => {
     const saved = localStorage.getItem('jeuDuBruitHighScore');
@@ -79,26 +80,26 @@ const JeuDuBruitPage: React.FC = () => {
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-      const checkVolume = () => {
-        if (!analyserRef.current) return;
-        analyserRef.current.getByteFrequencyData(dataArray);
-
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
-        }
-        const avg = sum / dataArray.length;
-
-        setVolume(avg);
-
-        // Saut si bruit > seuil ET personnage au sol
-        if (avg > VOLUME_THRESHOLD && Math.abs(charYRef.current) < 1) {
-          velocityYRef.current = JUMP_FORCE;
-          setIsJumping(true);
-        }
-
-        audioRequestRef.current = requestAnimationFrame(checkVolume);
-      };
+  const checkVolume = () => {
+    if (!analyserRef.current) return;
+    analyserRef.current.getByteFrequencyData(dataArray);
+    
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      sum += dataArray[i];
+    }
+    const avg = sum / dataArray.length;
+    
+    setVolume(avg);
+    
+    // Saut si bruit > seuil ET personnage au sol (avec une marge de tolérance)
+    if (avg > VOLUME_THRESHOLD && !isJumping) {
+      velocityYRef.current = JUMP_FORCE;
+      setIsJumping(true);
+    }
+    
+    audioRequestRef.current = requestAnimationFrame(checkVolume);
+  };
 
       checkVolume();
     } catch (err) {
@@ -127,9 +128,9 @@ const JeuDuBruitPage: React.FC = () => {
     velocityYRef.current = 0;
 
     const initialPlatforms: Platform[] = [
-      { id: nextPlatformIdRef.current++, x: 0, width: 1200 },
-      { id: nextPlatformIdRef.current++, x: 1500, width: 600 },
-      { id: nextPlatformIdRef.current++, x: 2400, width: 800 },
+      { id: nextPlatformIdRef.current++, x: 0, width: 1200, y: 0 },
+      { id: nextPlatformIdRef.current++, x: 1500, width: 600, y: -50 },
+      { id: nextPlatformIdRef.current++, x: 2400, width: 800, y: 50 },
     ];
     setPlatforms(initialPlatforms);
     platformsRef.current = initialPlatforms;
@@ -167,8 +168,10 @@ const JeuDuBruitPage: React.FC = () => {
 
     for (const plat of platformsRef.current) {
       if (absoluteCharX >= plat.x && absoluteCharX <= plat.x + plat.width) {
-        if (charYRef.current >= 0 && velocityYRef.current >= 0) {
-          charYRef.current = 0;
+        // Collision avec tolérance sur la hauteur de la plateforme
+        // On vérifie si le personnage est en train de descendre et s'il est proche du haut de la plateforme
+        if (velocityYRef.current >= 0 && charYRef.current >= plat.y - 10 && charYRef.current <= plat.y + 10) {
+          charYRef.current = plat.y;
           velocityYRef.current = 0;
           onPlatform = true;
           setIsJumping(false);
@@ -188,10 +191,15 @@ const JeuDuBruitPage: React.FC = () => {
     if (lastPlat.x < absoluteCharX + 1500) {
       const gap = 250 + Math.random() * 250;
       const width = 500 + Math.random() * 600;
+      // Nouvelle hauteur aléatoire entre -80 et 80
+      const lastY = lastPlat.y;
+      const newY = Math.max(-150, Math.min(150, lastY + (Math.random() * 160 - 80)));
+      
       const newPlat = {
         id: nextPlatformIdRef.current++,
         x: lastPlat.x + lastPlat.width + gap,
-        width: width
+        width: width,
+        y: newY
       };
       platformsRef.current = [...platformsRef.current, newPlat];
       if (platformsRef.current.length > 10) platformsRef.current.shift();
@@ -272,12 +280,13 @@ const JeuDuBruitPage: React.FC = () => {
             </div>
 
             {platforms.map(plat => (
-              <div
+              <div 
                 key={plat.id}
                 className="platform"
-                style={{
+                style={{ 
                   left: `${plat.x - scrollXRef.current}px`,
-                  width: `${plat.width}px`
+                  width: `${plat.width}px`,
+                  top: `${plat.y}px`
                 }}
               />
             ))}
