@@ -1,0 +1,345 @@
+.child-games-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #E8D5E0 0%, #D4E5F7 100%);
+  padding: 20px 16px 120px 16px;
+  font-family: 'Nunito', sans-serif;
+}
+
+.child-games-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.child-games-header h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: #333;
+  margin: 0 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: #666;
+  margin: 0;
+}
+
+.games-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .child-games-page {
+    padding: 40px 20px 120px 20px;
+  }
+
+  .child-games-header h1 {
+    font-size: 36px;
+  }
+
+  .subtitle {
+    font-size: 18px;
+  }
+
+  .games-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    max-width: 1000px;
+  }
+}
+
+.game-card {
+  background: white;
+  border-radius: 24px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.game-card:active {
+  transform: scale(0.95);
+}
+
+@media (min-width: 768px) {
+  .game-card {
+    padding: 30px;
+  }
+
+  .game-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+  }
+}
+
+.game-icon {
+  font-size: 56px;
+  margin-bottom: 12px;
+  animation: bounce 2s ease-in-out infinite;
+}
+
+@media (min-width: 768px) {
+  .game-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.game-card h3 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 8px 0;
+}
+
+@media (min-width: 768px) {
+  .game-card h3 {
+    font-size: 24px;
+  }
+}
+
+.game-card p {
+  font-size: 15px;
+  color: #999;
+  margin: 0 0 16px 0;
+}
+
+@media (min-width: 768px) {
+  .game-card p {
+    font-size: 16px;
+    margin-bottom: 20px;
+  }
+}
+
+.play-btn {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FFB347 100%);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Nunito', sans-serif;
+}
+
+.play-btn:active {
+  transform: scale(0.95);
+}
+
+@media (min-width: 768px) {
+  .play-btn {
+    font-size: 18px;
+  }
+
+  .play-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(255, 107, 107, 0.4);
+  }
+}
+
+/* No games state */
+.no-games {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+@media (min-width: 768px) {
+  .no-games {
+    padding: 80px 20px;
+  }
+}
+
+.no-games-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  animation: wiggle 1s ease-in-out infinite;
+}
+
+@media (min-width: 768px) {
+  .no-games-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+  }
+}
+
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+
+.no-games p {
+  font-size: 18px;
+  color: #666;
+  margin: 10px 0;
+}
+
+@media (min-width: 768px) {
+  .no-games p {
+    font-size: 20px;
+  }
+}
+
+.hint {
+  font-size: 15px !important;
+  color: #999;
+}
+
+@media (min-width: 768px) {
+  .hint {
+    font-size: 16px !important;
+  }
+}
+
+/* Loading */
+.child-games-loading {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #E8D5E0 0%, #D4E5F7 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Nunito', sans-serif;
+  padding: 20px;
+}
+
+.loading-spinner {
+  font-size: 56px;
+  animation: spin 2s linear infinite;
+}
+
+@media (min-width: 768px) {
+  .loading-spinner {
+    font-size: 64px;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.child-games-loading p {
+  font-size: 18px;
+  color: #666;
+  margin-top: 16px;
+}
+
+@media (min-width: 768px) {
+  .child-games-loading p {
+    font-size: 20px;
+    margin-top: 20px;
+  }
+}
+
+/* Mascotte */
+.mascot-container {
+  text-align: center;
+  margin-top: 40px;
+}
+
+@media (min-width: 768px) {
+  .mascot-container {
+    margin-top: 60px;
+  }
+}
+
+.mascot-ball {
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FFB347 100%);
+  border-radius: 50%;
+  margin: 0 auto 12px;
+  position: relative;
+  animation: bounce 2s ease-in-out infinite;
+  box-shadow: 0 4px 20px rgba(255, 107, 107, 0.3);
+}
+
+@media (min-width: 768px) {
+  .mascot-ball {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 16px;
+  }
+}
+
+.mascot-eye {
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 18px;
+  animation: blink 3s ease-in-out infinite;
+}
+
+@media (min-width: 768px) {
+  .mascot-eye {
+    width: 10px;
+    height: 10px;
+    top: 22px;
+  }
+}
+
+.mascot-eye-left {
+  left: 14px;
+}
+
+@media (min-width: 768px) {
+  .mascot-eye-left {
+    left: 18px;
+  }
+}
+
+.mascot-eye-right {
+  right: 14px;
+}
+
+@media (min-width: 768px) {
+  .mascot-eye-right {
+    right: 18px;
+  }
+}
+
+@keyframes blink {
+  0%, 48%, 52%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.1);
+  }
+}
+
+.mascot-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #666;
+}
+
+@media (min-width: 768px) {
+  .mascot-text {
+    font-size: 16px;
+  }
+}

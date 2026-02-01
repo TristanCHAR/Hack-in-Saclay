@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { api } from '../services/api';
+import { useChildRoute } from '../hooks/useRouteProtection';
 import './JeuDuBruitPage.css';
 
 interface Platform {
@@ -16,8 +17,16 @@ type GameState = 'menu' | 'playing' | 'gameOver';
 // Composant pour l'écran de fin
 const GameOverScreenWrapper: React.FC<{ score: number; navigate: any }> = ({ score, navigate }) => {
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const mode = searchParams.get('mode');
+
     const timer = setTimeout(() => {
-      navigate('/app/jeux');
+      if (mode === 'evaluation') {
+        // Redirection vers la fin de l'onboarding (Step 3: Bilan)
+        navigate('/child/onboarding?step=3');
+      } else {
+        navigate('/app/jeux');
+      }
     }, 3000);
     return () => clearTimeout(timer);
   }, [navigate]);
@@ -39,6 +48,7 @@ const GameOverScreenWrapper: React.FC<{ score: number; navigate: any }> = ({ sco
 };
 
 const JeuDuBruitPage: React.FC = () => {
+  useChildRoute(); // Protéger contre accès parent
   const navigate = useNavigate();
   const { isSessionActive, sessionDuration, sessionStartTime } = useSettings();
   const [gameState, setGameState] = useState<GameState>('menu');
@@ -93,12 +103,46 @@ const JeuDuBruitPage: React.FC = () => {
     return () => stopAudio();
   }, []);
 
+  const endGame = useCallback(async () => {
+    if (gameEndedRef.current) return;
+    gameEndedRef.current = true;
+    setGameState('gameOver');
+    stopAudio();
+
+    // Calcul des métriques
+    const jumps = jumpCountRef.current;
+    const latencies = reactionLatenciesRef.current;
+
+    const vocal_intention_latence = latencies.length > 0
+      ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
+      : 0;
+
+    const motrice_planification = jumps > 0 ? Math.round(totalAirTimeRef.current / jumps) : 0;
+
+    try {
+      await api.createNoiseGameResult(vocal_intention_latence, motrice_planification);
+      console.log('Score NoiseGame envoyé à l\'API');
+    } catch (err) {
+      console.error('Erreur envoi score NoiseGame:', err);
+    }
+
+    if (score > highScore) {
+      setHighScore(score);
+      localStorage.setItem('jeuDuBruitHighScore', score.toString());
+    }
+  }, [score, highScore]);
+
   // Vérifier si la session expire pendant le jeu
   useEffect(() => {
-    if (gameState === 'playing' && !isSessionActive) {
+    const searchParams = new URLSearchParams(window.location.search);
+    const isEvaluation = searchParams.get('mode') === 'evaluation';
+
+    if (gameState === 'playing' && !isSessionActive && !isEvaluation) {
+      console.log("[JeuDuBruit] Session expired during gameplay!");
       endGame();
+      alert("La session est terminée ! Ton temps de jeu est épuisé.");
     }
-  }, [gameState, isSessionActive]);
+  }, [gameState, isSessionActive, endGame]);
 
   const startAudio = async () => {
     try {
@@ -129,36 +173,36 @@ const JeuDuBruitPage: React.FC = () => {
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-  const checkVolume = () => {
-    if (!analyserRef.current) return;
-    analyserRef.current.getByteFrequencyData(dataArray);
-    
-    let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-      sum += dataArray[i];
-    }
-    const avg = sum / dataArray.length;
-    
-    setVolume(avg);
-    
-    // Saut si bruit > seuil ET personnage au sol (ref pour éviter stale closure)
-    if (avg > VOLUME_THRESHOLD && !isJumpingRef.current) {
-      velocityYRef.current = JUMP_FORCE;
-      isJumpingRef.current = true;
-      setIsJumping(true);
-      jumpCountRef.current++;
-      airTimeStartRef.current = Date.now();
+      const checkVolume = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(dataArray);
 
-      // Mesure de latence vocale : temps entre détection du gap et ce saut
-      if (gapDetectedTimeRef.current !== null) {
-        const latency = Date.now() - gapDetectedTimeRef.current;
-        reactionLatenciesRef.current.push(latency);
-        gapDetectedTimeRef.current = null;
-      }
-    }
-    
-    audioRequestRef.current = requestAnimationFrame(checkVolume);
-  };
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i];
+        }
+        const avg = sum / dataArray.length;
+
+        setVolume(avg);
+
+        // Saut si bruit > seuil ET personnage au sol (ref pour éviter stale closure)
+        if (avg > VOLUME_THRESHOLD && !isJumpingRef.current) {
+          velocityYRef.current = JUMP_FORCE;
+          isJumpingRef.current = true;
+          setIsJumping(true);
+          jumpCountRef.current++;
+          airTimeStartRef.current = Date.now();
+
+          // Mesure de latence vocale : temps entre détection du gap et ce saut
+          if (gapDetectedTimeRef.current !== null) {
+            const latency = Date.now() - gapDetectedTimeRef.current;
+            reactionLatenciesRef.current.push(latency);
+            gapDetectedTimeRef.current = null;
+          }
+        }
+
+        audioRequestRef.current = requestAnimationFrame(checkVolume);
+      };
 
       checkVolume();
     } catch (err) {
@@ -179,7 +223,7 @@ const JeuDuBruitPage: React.FC = () => {
     analyserRef.current = null;
   };
 
-  const initGame = async () => {
+  const startGame = async () => {
     gameEndedRef.current = false;
     jumpCountRef.current = 0;
     gameStartTimeRef.current = Date.now();
@@ -305,36 +349,12 @@ const JeuDuBruitPage: React.FC = () => {
     };
   }, [gameState, gameLoop]);
 
-  const endGame = async () => {
-    if (gameEndedRef.current) return;
-    gameEndedRef.current = true;
-    setGameState('gameOver');
-    stopAudio();
+  // endGame move up
 
-    // Calcul des métriques
-    const jumps = jumpCountRef.current;
-    const latencies = reactionLatenciesRef.current;
-
-    // Latence vocale = temps moyen de réaction entre détection d'un gap et le saut
-    const vocal_initention_latence = latencies.length > 0
-      ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
-      : 0;
-
-    // Planification motrice = durée moyenne en l'air par saut
-    const motrice_planification = jumps > 0 ? Math.round(totalAirTimeRef.current / jumps) : 0;
-
-    try {
-      await api.createNoiseGameResult(vocal_initention_latence, motrice_planification);
-      console.log('Score NoiseGame envoyé à l\'API');
-    } catch (err) {
-      console.error('Erreur envoi score NoiseGame:', err);
-    }
-
-    if (score > highScore) {
-      setHighScore(score);
-      localStorage.setItem('jeuDuBruitHighScore', score.toString());
-    }
-  };
+  // Mode évaluation : on ignore la limite de session
+  const searchParams = new URLSearchParams(window.location.search);
+  const isEvaluation = searchParams.get('mode') === 'evaluation';
+  const canPlay = isSessionActive || isEvaluation;
 
   return (
     <div className="noise-game-screen">
@@ -358,9 +378,21 @@ const JeuDuBruitPage: React.FC = () => {
             <h1 className="game-title-minimal">NoiseGame</h1>
             <p className="game-subtitle-minimal">Crie ou fais du bruit pour faire sauter ton personnage !</p>
             {highScore > 0 && <p className="high-score-minimal">Record : {highScore}</p>}
-            <button className="btn-primary" onClick={initGame} disabled={!isSessionActive}>
-              {isSessionActive ? 'Commencer' : 'Session expirée'}
+            <button className="btn-primary" onClick={startGame} disabled={!canPlay}>
+              {canPlay ? 'Commencer' : 'Session expirée'}
             </button>
+            {!canPlay && (
+              <p className="session-expired-hint" style={{ marginTop: '10px', fontSize: '0.9rem', color: '#ff6b6b' }}>
+                Votre temps de jeu est épuisé pour cette session.
+              </p>
+            )}
+
+            {/* Debug Info */}
+            <div style={{ marginTop: '30px', fontSize: '10px', opacity: 0.3, color: '#666' }}>
+              <p>Durée configurée : {sessionDuration}s</p>
+              <p>Session active : {isSessionActive ? 'OUI' : 'NON'}</p>
+              <p>Start Time : {sessionStartTime ? new Date(sessionStartTime).toLocaleTimeString() : 'NUL'}</p>
+            </div>
           </div>
         </div>
       ) : gameState === 'gameOver' ? (

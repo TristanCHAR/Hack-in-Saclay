@@ -1,0 +1,41 @@
+.register-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #E8D5E0 0%, #D4E5F7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  font-family: 'Nunito', sans-serif;
+}
+
+.register-container {
+  background: white;
+  border-radius: 32px;
+  padding: 48px 40px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.register-container h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: #1A1A1A;
+  margin-bottom: 8px;
+}
+
+.register-form {
+  text-align: left;
+}
+
+.register-footer {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.register-footer p {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 8px;
+}

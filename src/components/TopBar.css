@@ -1,0 +1,242 @@
+.top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  z-index: 1000;
+}
+
+.top-bar-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 100%;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-title {
+  font-size: 24px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FFB347 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+}
+
+.top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Workspace selector */
+.workspace-selector {
+  position: relative;
+}
+
+.workspace-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: white;
+  border: 2px solid #E0E0E0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.workspace-btn:hover {
+  border-color: #FF6B6B;
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.2);
+}
+
+.workspace-icon {
+  font-size: 18px;
+}
+
+.workspace-name {
+  color: #333;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  color: #999;
+  transition: transform 0.2s;
+}
+
+.workspace-btn:hover .dropdown-arrow {
+  transform: translateY(2px);
+}
+
+/* Dropdown */
+.workspace-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  min-width: 280px;
+  overflow: hidden;
+  animation: dropdownFade 0.2s ease-out;
+}
+
+@keyframes dropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-header {
+  padding: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #F0F0F0;
+}
+
+.workspace-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border: none;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  text-align: left;
+}
+
+.workspace-option:hover {
+  background: #F9F9F9;
+}
+
+.workspace-option.active {
+  background: linear-gradient(135deg, #FFE8E8 0%, #FFF3E0 100%);
+}
+
+.ws-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.ws-role {
+  font-size: 12px;
+  color: #999;
+  background: #F0F0F0;
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #F0F0F0;
+  margin: 8px 0;
+}
+
+.workspace-option.manage {
+  color: #FF6B6B;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Sign out button */
+.sign-out-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 2px solid #E0E0E0;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sign-out-btn:hover {
+  border-color: #FF6B6B;
+  background: #FFF5F5;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .app-title {
+    font-size: 20px;
+  }
+
+  .workspace-name {
+    max-width: 120px;
+  }
+}
+
+/* Notification Button */
+.notification-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 2px solid #E0E0E0;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  position: relative;
+}
+
+.notification-btn:hover {
+  border-color: #FF6B6B;
+  background: #FFF5F5;
+  transform: translateY(-2px);
+}
+
+.bell-icon {
+  font-size: 20px;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #FF6B6B;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+}

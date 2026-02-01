@@ -1,0 +1,160 @@
+.workspace-select-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #E8D5E0 0%, #D4E5F7 100%);
+  padding: 40px 20px;
+  font-family: 'Nunito', sans-serif;
+}
+
+.workspace-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.workspace-container h1 {
+  font-size: 32px;
+  font-weight: 800;
+  color: #1A1A1A;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.workspace-container .subtitle {
+  text-align: center;
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 32px;
+}
+
+.workspace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.workspace-card {
+  background: white;
+  border-radius: 24px;
+  padding: 24px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.workspace-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.workspace-card h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin: 0;
+}
+
+.role-badge {
+  background: linear-gradient(135deg, #9B7ED9 0%, #7DD3C0 100%);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.workspace-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-primary, .btn-secondary {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Nunito', sans-serif;
+  transition: transform 0.2s;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #9B7ED9 0%, #7DD3C0 100%);
+  color: white;
+}
+
+.btn-secondary {
+  background: white;
+  color: #9B7ED9;
+  border: 2px solid #9B7ED9;
+}
+
+.btn-primary:hover, .btn-secondary:hover {
+  transform: scale(1.02);
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 24px;
+  padding: 32px;
+  max-width: 400px;
+  width: 100%;
+}
+
+.modal-content h2 {
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 20px;
+  color: #1A1A1A;
+}
+
+.modal-content input {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 16px;
+  border: 2px solid #E8E8E8;
+  border-radius: 16px;
+  font-family: 'Nunito', sans-serif;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+.modal-content input:focus {
+  outline: none;
+  border-color: #9B7ED9;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.workspace-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #666;
+  background: linear-gradient(135deg, #E8D5E0 0%, #D4E5F7 100%);
+}
